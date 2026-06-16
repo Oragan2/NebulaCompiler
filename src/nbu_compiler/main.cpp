@@ -31,17 +31,18 @@ void print_tree(const std::vector<ASTNode>& astnodes) {
     }
 }
 
-int main() {
-    std::vector<Token> tokens;
-    tokens.push_back({.type = TokenType::RETURN, .val = -1});
-    tokens.push_back({.type = TokenType::INT_SIGNED_32, .val = 10});
-    tokens.push_back({.type = TokenType::PLUS, .val = -1});
-    tokens.push_back({.type = TokenType::INT_SIGNED_32, .val = 42});
-    tokens.push_back({.type = TokenType::STAR, .val = 42});
-    tokens.push_back({.type = TokenType::INT_SIGNED_32, .val = 2});
-    tokens.push_back({.type = TokenType::SEMICOLON, .val = -1});
-    Parser parser(tokens);
-    auto astnodes = parser.parse();
-    print_tree(astnodes);
-    return 0;
+int main(int argc, char **argv) {
+  if (argc == 1) {
+    throw std::runtime_error("Bad usage, no input file");
+  }
+
+  std::ifstream inputfile(argv[1]);
+
+  std::vector<Token> tokens = lexer(inputfile);
+
+  Parser parser(tokens);
+
+  parser.parse();
+
+  return EXIT_SUCCESS;
 }

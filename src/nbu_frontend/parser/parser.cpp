@@ -12,7 +12,8 @@ Token Parser::consume(TokenType expected) {
     if (expected == peek().type) {
         return tokens[cursor++];
     }
-    throw std::runtime_error("Syntax Error"); // will make a separate function later
+    std::cerr << expected << " : " << peek().type << std::endl;
+    throw std::runtime_error("Syntax Error "); // will make a separate function later
 }
 
 ASTNode Parser::parse_sentence() {
