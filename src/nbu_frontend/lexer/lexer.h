@@ -5,7 +5,18 @@ enum class TokenType {
     RETURN,
     INT_SIGNED_32,
     SEMICOLON,
-    ALL
+    PLUS,
+    MINUS,
+    STAR,
+    SLASH,
+    PERCENT,
+    AND,
+    OR,
+    XOR,
+    NOT,
+    EXCLAMATION,
+    SHIFTL,
+    SHIFTR
 };
 
 struct Token {
