@@ -42,7 +42,9 @@ int main(int argc, char **argv) {
 
   Parser parser(tokens);
 
-  parser.parse();
+  std::vector<ASTNode> nodes = parser.parse();
+
+  print_tree(nodes);
 
   return EXIT_SUCCESS;
 }

@@ -1,4 +1,5 @@
 #include "lexer.h"
+#include <cctype>
 #include <iostream>
 #include <string>
 #include <string_view>
@@ -23,6 +24,9 @@ std::ostream &operator<<(std::ostream &os, TokenType token) {
     break;
   case TokenType::RETURN:
     os << "return";
+    break;
+  case TokenType::SEMICOLON:
+    os << ";";
     break;
   default:
     os << "TODO";
@@ -76,7 +80,7 @@ std::vector<Token> lexer(std::ifstream &file) {
       }
       break;
     case State::TEXT:
-      if (std::isalnum(c))
+      if (std::isalpha(c))
         word += c;
       else {
         flush_token();
