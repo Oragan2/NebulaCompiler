@@ -1,0 +1,3 @@
+add_subdirectory(nbu_compiler)
+add_subdirectory(nbu_frontend)
+add_subdirectory(nbu_lsp)
