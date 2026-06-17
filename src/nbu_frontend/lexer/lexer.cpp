@@ -24,7 +24,8 @@ std::unordered_map<char, TokenType> SymboleTable{
     {'(', TokenType::LPARAM},
     {')', TokenType::RPARAM},
     {'{', TokenType::LBRAK},
-    {'}', TokenType::RBRAK}
+    {'}', TokenType::RBRAK},
+    {',', TokenType::COMMA}
 };
 
 std::unordered_map<std::string, TokenType> KeywordMap{
@@ -41,7 +42,8 @@ std::unordered_map<std::string, TokenType> KeywordMap{
     {"==", TokenType::EQUALEQUAL},
     {"!=", TokenType::DIFFERENT},
     {"if", TokenType::IF},
-    {"else", TokenType::ELSE}
+    {"else", TokenType::ELSE},
+    {"func", TokenType::FUNC}
 };
 
 std::ostream &operator<<(std::ostream &os, TokenType token) {
@@ -150,6 +152,12 @@ std::ostream &operator<<(std::ostream &os, TokenType token) {
     break;
   case TokenType::RBRAK:
     os << "}";
+    break;
+  case TokenType::FUNC:
+    os << "func";
+    break;
+  case TokenType::COMMA:
+    os << ",";
     break;
   default:
     os << "TODO";

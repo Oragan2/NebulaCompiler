@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <list>
+#include <map>
 
 using ASTNode = std::variant<
     struct Int32LiteralNode,
@@ -16,7 +17,8 @@ using ASTNode = std::variant<
     struct VariableAccess,
     struct UnaryOpNode,
     struct IfStmtNode,
-    struct BlockStmtNode
+    struct BlockStmtNode,
+    struct FuncStmtNode
 >;
 
 struct Int32LiteralNode {
@@ -57,9 +59,20 @@ struct BlockStmtNode {
     std::list<std::unique_ptr<ASTNode>> codes;
 };
 
+struct FuncStmtNode {
+    TokenType retType;
+    std::list<std::unique_ptr<ASTNode>> parameters;
+    std::unique_ptr<ASTNode> code;
+};
+
 struct SymboleInfo {
     TokenType type;
     unsigned int stack_offset;
+};
+
+struct FunctionInfo {
+    TokenType retType;
+    std::map<std::string, SymboleInfo> LocalSymboleTable;
 };
 
 enum Precedence {
@@ -86,14 +99,19 @@ class Parser {
     private:
     std::vector<Token> tokens;
     unsigned int cursor;
+    std::map<std::string, FunctionInfo> functions;
+    std::map<std::string, SymboleInfo> GlobalSymboleTable;
+    FunctionInfo currentFunc;
 
     inline Token peek();
     Token consume(TokenType expected);
     ASTNode parse_sentence();
     ASTNode parse_return_sentence();
-    ASTNode parse_variable_sentence();
+    ASTNode parse_local_variable_sentence();
     ASTNode parse_if_sentence();
     ASTNode parse_block();
+    ASTNode parse_function();
+    ASTNode parse_parameter();
     ASTNode parse_expression(int precedence);
     ASTNode parse_primary();
 };

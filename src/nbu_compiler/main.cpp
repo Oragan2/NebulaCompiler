@@ -25,7 +25,8 @@ void print_node(const ASTNode& node) {
             },
             [](const VariableDeclare& n) {
                 std::cout << "VariableDeclare " << n.type << " ";
-                print_node(*n.info);
+                if (n.info != nullptr)
+                    print_node(*n.info);
             },
             [](const VariableAccess& n) {
                 std::cout << "VariableAccess " << n.name << " ";
@@ -53,6 +54,13 @@ void print_node(const ASTNode& node) {
                     std::cout << "\n";
                 }
                 std::cout << "}";
+            },
+            [](const FuncStmtNode& n) {
+                std::cout << "func " << n.retType << "(";
+                for(const auto& m : n.parameters)
+                    print_node(*m);
+                std::cout << ")";
+                print_node(*n.code);
             }
         }, node);
 }
@@ -60,7 +68,7 @@ void print_node(const ASTNode& node) {
 void print_tree(const std::vector<ASTNode>& astnodes) {
     for (const auto& astnode : astnodes) {
         print_node(astnode);
-        std::cout << '\n';
+        std::cout << "\n";
     }
 }
 

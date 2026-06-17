@@ -41,6 +41,8 @@ enum class TokenType {
     RPARAM, //done
     LBRAK, //done
     RBRAK, //done
+    FUNC, //done
+    COMMA, //done
     EOFTOKEN //done
 };
 

@@ -9,8 +9,6 @@
 
 Parser::Parser(const std::vector<Token>& tokens) : tokens{tokens}, cursor{0} {}
 
-std::map<std::string, SymboleInfo> SymboleTable;
-
 std::set<TokenType> typeTable {
     TokenType::INT32,
     TokenType::UINT32
@@ -28,10 +26,10 @@ Token Parser::consume(TokenType expected) {
 }
 
 ASTNode Parser::parse_sentence() {
-    if (peek().type == TokenType::RETURN)
-        return parse_return_sentence();
-    else if (typeTable.find(peek().type) != typeTable.end())
-        return parse_variable_sentence();
+    if (peek().type == TokenType::RETURN) 
+        return parse_return_sentence();        
+    else if (typeTable.find(peek().type) != typeTable.end()) 
+        return parse_local_variable_sentence();
     else if (peek().type == TokenType::IF)
         return parse_if_sentence();
     else {
@@ -50,11 +48,9 @@ ASTNode Parser::parse_if_sentence() {
 
     if (peek().type == TokenType::LBRAK) 
         ret.ifNode = std::make_unique<ASTNode>(std::move(parse_block()));
-    
     else 
         ret.ifNode = std::make_unique<ASTNode>(std::move(parse_sentence()));
     
-
     if (peek().type == TokenType::ELSE) {
         consume(TokenType::ELSE);
         ret.elseNode = std::make_unique<ASTNode>(std::move(parse_sentence()));
@@ -75,17 +71,22 @@ ASTNode Parser::parse_block() {
     return ret;
 }
 
-ASTNode Parser::parse_variable_sentence() {
+ASTNode Parser::parse_local_variable_sentence() {
     VariableDeclare ret = (VariableDeclare){.type = peek().type};
     consume(peek().type);
     std::string name = peek().val; 
     consume(TokenType::IDENTIFIER);
-    consume(TokenType::EQUAL);
-    ASTNode info = parse_expression(Precedence::LOWEST);
-    consume(TokenType::SEMICOLON);
-    ret.info = std::make_unique<ASTNode>(std::move(info));
+    if (peek().type == TokenType::EQUAL) {
+        consume(TokenType::EQUAL);
+        ASTNode info = parse_expression(Precedence::LOWEST);
+        ret.info = std::make_unique<ASTNode>(std::move(info));
+    }
+    else 
+        ret.info = nullptr;
 
-    SymboleTable.emplace(name, (SymboleInfo){.type = ret.type, .stack_offset = 0});
+    consume(TokenType::SEMICOLON);
+
+    currentFunc.LocalSymboleTable.emplace(name, (SymboleInfo){.type = ret.type, .stack_offset = 0});
 
     return ret;
 }
@@ -99,7 +100,7 @@ ASTNode Parser::parse_return_sentence() {
 }
 
 ASTNode Parser::parse_primary() {
-    if (peek().type == TokenType::IDENTIFIER && SymboleTable.find(peek().val) != SymboleTable.end()) {
+    if (peek().type == TokenType::IDENTIFIER && (GlobalSymboleTable.find(peek().val) != GlobalSymboleTable.end() || currentFunc.LocalSymboleTable.find(peek().val) != currentFunc.LocalSymboleTable.end())) {
         return (VariableAccess){.name = consume(TokenType::IDENTIFIER).val};
     }
     else if (peek().type == TokenType::IDENTIFIER) {
@@ -183,8 +184,65 @@ std::vector<ASTNode> Parser::parse() {
     std::vector<ASTNode> astnodes;
     Token token = peek();
     while (token.type != TokenType::EOFTOKEN) {
-        astnodes.push_back(parse_sentence());
+        if (token.type != TokenType::FUNC) { //global variable will be added later
+            std::cerr << "Error only functions or global variable allowed at file level";
+            std::cerr << "Line : " << token.line << " Column : " << token.column << "\n";
+            return astnodes;
+        }
+        else {
+            astnodes.push_back(parse_function());
+        }
         token = peek();
     }
     return astnodes;
+}
+
+ASTNode Parser::parse_parameter() {
+    VariableDeclare ret;
+    if (typeTable.find(peek().type) == typeTable.end()) {
+        std::cerr << "Unkown type : " << peek().type << "\n";
+        std::cerr << "Line : " << peek().line << " Column : " << peek().column << "\n";
+    }
+    ret.type = peek().type;
+    consume(peek().type);
+    std::string name = peek().val;
+    consume(TokenType::IDENTIFIER);
+    if (peek().type == TokenType::EQUAL) {
+        consume(TokenType::EQUAL);
+        ret.info = std::make_unique<ASTNode>(std::move(parse_expression(Precedence::LOWEST)));
+    }
+    else
+        ret.info = nullptr;
+    
+    currentFunc.LocalSymboleTable.emplace(name,SymboleInfo{.type = ret.type, .stack_offset = 0});
+    return ret;
+}
+
+ASTNode Parser::parse_function() {
+    FuncStmtNode ret;
+    currentFunc = FunctionInfo{};
+    consume(TokenType::FUNC);
+    if (typeTable.find(peek().type) == typeTable.end()) {
+        std::cerr << "Awaited a function return parameter\n";
+        std::cerr << "Line : " << peek().line << " Column : " << peek().column << "\n";
+    }
+    ret.retType = peek().type;
+    currentFunc.retType = peek().type;
+    consume(peek().type);
+    std::string name = peek().val; 
+    consume(TokenType::IDENTIFIER);
+    consume(TokenType::LPARAM);
+    while (peek().type != TokenType::RPARAM) {
+        ret.parameters.push_back(std::make_unique<ASTNode>(std::move(parse_parameter())));
+        if (peek().type != TokenType::RPARAM)
+            consume(TokenType::COMMA);
+    }
+    consume(TokenType::RPARAM);
+    if (peek().type == TokenType::LBRAK) 
+        ret.code = std::make_unique<ASTNode>(std::move(parse_block()));
+    else if (peek().type == TokenType::SEMICOLON)
+        ret.code = nullptr;
+    else 
+        ret.code = std::make_unique<ASTNode>(std::move(parse_sentence()));
+    return ret; 
 }

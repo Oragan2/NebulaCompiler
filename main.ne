@@ -1,9 +1,14 @@
-int32 x = 2*2/3;
-int32 y = x+1;
-int32 z = ~y;
-if (x == y)
-    int32 tmp = 1;
-else if (x == z) {
-    int32 tmp = 1;
+func uint32 test()
+    return 3;
+
+func int32 main() {
+    int32 x = 2*2/3;
+    int32 y = x+1;
+    int32 z = ~y;
+    if (x == y)
+        int32 tmp = 1;
+    else if (x == z) {
+        int32 tmp = 1;
+    }
+    return x+y;
 }
-return x+y;
