@@ -50,6 +50,8 @@ class Parser {
     std::vector<Token> tokens;
     unsigned int cursor;
 
+    void printError(TokenType expected);
+    void printError();
     inline Token peek();
     Token consume(TokenType expected);
     ASTNode parse_sentence();

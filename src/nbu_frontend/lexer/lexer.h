@@ -3,31 +3,35 @@
 
 #include <fstream>
 #include <vector>
+#include <string>
 
 enum class TokenType {
-    RETURN,
-    INT_SIGNED_32,
-    SEMICOLON,
-    PLUS,
-    MINUS,
-    STAR,
-    SLASH,
-    PERCENT,
-    AND,
-    OR,
-    XOR,
-    NOT,
-    EXCLAMATION,
-    SHIFTL,
-    SHIFTR
+    RETURN, //done
+    INT_SIGNED_32, //done
+    SEMICOLON, //done
+    PLUS, //done
+    MINUS, //done
+    STAR, //done
+    SLASH, //done
+    PERCENT, //done
+    AND, //done
+    OR, //done
+    XOR, //done
+    NOT, //done
+    EXCLAMATION, //done
+    SHIFTL, //done
+    SHIFTR, //done
+    EOFTOKEN
 };
 
 struct Token {
     TokenType type;
-    int val;
+    std::string val;
+    unsigned int column;
+    unsigned int line;
 
-    Token(TokenType token, int value) : type{token}, val{value} {}
-    Token(TokenType token) : Token{token, 0} {}
+    Token(TokenType token, std::string value, unsigned int col, unsigned int li) : type{token}, val{value} {}
+    Token(TokenType token, unsigned int col, unsigned int li) : Token{token, "", col, li} {}
 }; 
 
 enum class State { START, TEXT, NUMBER };

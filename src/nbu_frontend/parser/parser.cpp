@@ -12,15 +12,25 @@ Token Parser::consume(TokenType expected) {
     if (expected == peek().type) {
         return tokens[cursor++];
     }
-    std::cerr << expected << " : " << peek().type << std::endl;
-    throw std::runtime_error("Syntax Error "); // will make a separate function later
+    printError(expected);
+}
+
+void Parser::printError(TokenType expected) {
+    std::cerr << "Received : " << peek().type << "\n";
+    std::cerr << "Expected : " << expected << "\n";
+    std::cerr << "Error on line : " << peek().line << " column : " << peek().column << "\n";
+}
+
+void Parser::printError() {
+    std::cerr << "Received : " << peek().type << "\n";
+    std::cerr << "Error on line : " << peek().line << " column : " << peek().column << "\n";
 }
 
 ASTNode Parser::parse_sentence() {
     if (peek().type == TokenType::RETURN)
         return parse_return_sentence();
     else
-        throw std::runtime_error("Unknown sentence type");
+        printError();
 }
 
 ASTNode Parser::parse_return_sentence() {
@@ -32,7 +42,7 @@ ASTNode Parser::parse_return_sentence() {
 }
 
 ASTNode Parser::parse_primary() {
-    return (IntLiteralNode){.value = consume(TokenType::INT_SIGNED_32).val};
+    return (IntLiteralNode){.value = std::stoi(consume(TokenType::INT_SIGNED_32).val)};
 }
 
 Precedence get_token_precedence(TokenType type) {
@@ -78,9 +88,10 @@ ASTNode Parser::parse_expression(int precedence) {
 
 std::vector<ASTNode> Parser::parse() {
     std::vector<ASTNode> astnodes;
-    while (cursor < tokens.size()) {
-        Token token = tokens[cursor];
+    Token token = peek();
+    while (token.type != TokenType::EOFTOKEN) {
         astnodes.push_back(parse_sentence());
+        token = peek();
     }
     return astnodes;
 }
