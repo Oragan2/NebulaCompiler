@@ -31,11 +31,48 @@ ASTNode Parser::parse_sentence() {
     if (peek().type == TokenType::RETURN)
         return parse_return_sentence();
     else if (typeTable.find(peek().type) != typeTable.end())
-        return parse_variable_sentence();    
+        return parse_variable_sentence();
+    else if (peek().type == TokenType::IF)
+        return parse_if_sentence();
     else {
         std::cerr << "Received : " << peek().type << "\n";
         std::cerr << "Error on line : " << peek().line << " column : " << peek().column << "\n";
     }
+}
+
+ASTNode Parser::parse_if_sentence() {
+    IfStmtNode ret;
+    consume(TokenType::IF);
+    consume(TokenType::LPARAM);
+    ASTNode condition = parse_expression(Precedence::LOWEST);
+    ret.condition = std::make_unique<ASTNode>(std::move(condition));
+    consume(TokenType::RPARAM);
+
+    if (peek().type == TokenType::LBRAK) 
+        ret.ifNode = std::make_unique<ASTNode>(std::move(parse_block()));
+    
+    else 
+        ret.ifNode = std::make_unique<ASTNode>(std::move(parse_sentence()));
+    
+
+    if (peek().type == TokenType::ELSE) {
+        consume(TokenType::ELSE);
+        ret.elseNode = std::make_unique<ASTNode>(std::move(parse_sentence()));
+    }
+    else
+        ret.elseNode = nullptr;
+
+    return ret;
+}
+
+ASTNode Parser::parse_block() {
+    consume(TokenType::LBRAK);
+    BlockStmtNode ret;
+    while (peek().type != TokenType::RBRAK) {
+        ret.codes.push_back(std::move(std::make_unique<ASTNode>(parse_sentence())));
+    }
+    consume(TokenType::RBRAK);
+    return ret;
 }
 
 ASTNode Parser::parse_variable_sentence() {

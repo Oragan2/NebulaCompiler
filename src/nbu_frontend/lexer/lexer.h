@@ -35,6 +35,12 @@ enum class TokenType {
     ANDAND, //done
     OROR, //done
     XORXOR, //done
+    IF, //done
+    ELSE, //done
+    LPARAM, //done
+    RPARAM, //done
+    LBRAK, //done
+    RBRAK, //done
     EOFTOKEN //done
 };
 

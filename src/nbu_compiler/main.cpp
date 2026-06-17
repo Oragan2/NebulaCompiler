@@ -34,6 +34,25 @@ void print_node(const ASTNode& node) {
                 std::cout << "UnaryOpNode(" << n.op;
                 print_node(*n.operand);
                 std::cout << ") ";
+            },
+            [](const IfStmtNode& n) {
+                std::cout << "if (";
+                print_node(*n.condition);
+                std::cout << ") ";
+                print_node(*n.ifNode);
+                if (n.elseNode != nullptr) {
+                    std::cout << "\nelse ";
+                    print_node(*n.elseNode);
+                }
+            },
+            [](const BlockStmtNode& n) {
+                std::cout << "{\n\t";
+                for (const auto& sentence : n.codes) {
+                    std::cout << "\t";
+                    print_node(*sentence);
+                    std::cout << "\n";
+                }
+                std::cout << "}";
             }
         }, node);
 }

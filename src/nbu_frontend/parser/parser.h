@@ -6,6 +6,7 @@
 #include <variant>
 #include <memory>
 #include <string>
+#include <list>
 
 using ASTNode = std::variant<
     struct Int32LiteralNode,
@@ -13,7 +14,9 @@ using ASTNode = std::variant<
     struct BinaryOpNode,
     struct VariableDeclare,
     struct VariableAccess,
-    struct UnaryOpNode
+    struct UnaryOpNode,
+    struct IfStmtNode,
+    struct BlockStmtNode
 >;
 
 struct Int32LiteralNode {
@@ -42,6 +45,16 @@ struct VariableAccess {
 struct UnaryOpNode {
     TokenType op;
     std::unique_ptr<ASTNode> operand;
+};
+
+struct IfStmtNode {
+    std::unique_ptr<ASTNode> condition;
+    std::unique_ptr<ASTNode> ifNode;
+    std::unique_ptr<ASTNode> elseNode;
+};
+
+struct BlockStmtNode {
+    std::list<std::unique_ptr<ASTNode>> codes;
 };
 
 struct SymboleInfo {
@@ -79,6 +92,8 @@ class Parser {
     ASTNode parse_sentence();
     ASTNode parse_return_sentence();
     ASTNode parse_variable_sentence();
+    ASTNode parse_if_sentence();
+    ASTNode parse_block();
     ASTNode parse_expression(int precedence);
     ASTNode parse_primary();
 };
