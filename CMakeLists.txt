@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
-set(LANGUAGE CXX)
 
-project(NebulaCompiler)
+project(NebulaCompiler LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
