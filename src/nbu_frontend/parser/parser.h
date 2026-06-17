@@ -5,15 +5,19 @@
 #include <vector>
 #include <variant>
 #include <memory>
+#include <string>
 
 using ASTNode = std::variant<
-    struct IntLiteralNode,
+    struct Int32LiteralNode,
     struct ReturnStmtNode,
-    struct BinaryOpNode
+    struct BinaryOpNode,
+    struct VariableDeclare,
+    struct VariableAccess,
+    struct UnaryOpNode
 >;
 
-struct IntLiteralNode {
-    int value;
+struct Int32LiteralNode {
+    int32_t value;
 };
 
 struct ReturnStmtNode {
@@ -26,10 +30,30 @@ struct BinaryOpNode {
     std::unique_ptr<ASTNode> right;
 };
 
+struct VariableDeclare {
+    TokenType type;
+    std::unique_ptr<ASTNode> info;
+};
+
+struct VariableAccess {
+    std::string name; 
+}; //Temp implementation will be changed later
+
+struct UnaryOpNode {
+    TokenType op;
+    std::unique_ptr<ASTNode> operand;
+};
+
+struct SymboleInfo {
+    TokenType type;
+    unsigned int stack_offset;
+};
+
 enum Precedence {
     LOWEST,
     LOGICAL_OR,
     LOGICAL_AND,
+    LOGICAL_XOR,
     BIT_OR,
     BIT_XOR,
     BIT_AND,
@@ -50,12 +74,11 @@ class Parser {
     std::vector<Token> tokens;
     unsigned int cursor;
 
-    void printError(TokenType expected);
-    void printError();
     inline Token peek();
     Token consume(TokenType expected);
     ASTNode parse_sentence();
     ASTNode parse_return_sentence();
+    ASTNode parse_variable_sentence();
     ASTNode parse_expression(int precedence);
     ASTNode parse_primary();
 };

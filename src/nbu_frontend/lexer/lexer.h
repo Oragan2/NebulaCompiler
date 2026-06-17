@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 
+// the one marked as done mean they are printable to the console
 enum class TokenType {
     RETURN, //done
     INT_SIGNED_32, //done
@@ -21,7 +22,20 @@ enum class TokenType {
     EXCLAMATION, //done
     SHIFTL, //done
     SHIFTR, //done
-    EOFTOKEN
+    IDENTIFIER,
+    INT32, //done
+    UINT32, //done
+    EQUAL, //done
+    EQUALEQUAL, //done
+    DIFFERENT, //done
+    LT, //done
+    MT, //done
+    LTE, //done
+    MTE, //done
+    ANDAND, //done
+    OROR, //done
+    XORXOR, //done
+    EOFTOKEN //done
 };
 
 struct Token {
@@ -30,7 +44,7 @@ struct Token {
     unsigned int column;
     unsigned int line;
 
-    Token(TokenType token, std::string value, unsigned int col, unsigned int li) : type{token}, val{value} {}
+    Token(TokenType token, const std::string& value, unsigned int col, unsigned int li) : type{token}, val{std::move(value)}, column{col}, line{li} {}
     Token(TokenType token, unsigned int col, unsigned int li) : Token{token, "", col, li} {}
 }; 
 

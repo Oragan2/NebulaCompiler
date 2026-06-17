@@ -9,17 +9,31 @@ template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 
 void print_node(const ASTNode& node) {
     std::visit(overloads {
-            [](const IntLiteralNode& n) {
+            [](const Int32LiteralNode& n) {
                 std::cout << "Int " << n.value << " ";
             },
             [](const BinaryOpNode& n) {
-                std::cout << "BinaryOp ";
+                std::cout << "BinaryOp(";
                 print_node(*n.left);
+                std::cout << n.op << " ";
                 print_node(*n.right);
+                std::cout << ") ";
             },
             [](const ReturnStmtNode& n) {
                 std::cout << "Return ";
                 print_node(*n.expression);
+            },
+            [](const VariableDeclare& n) {
+                std::cout << "VariableDeclare " << n.type << " ";
+                print_node(*n.info);
+            },
+            [](const VariableAccess& n) {
+                std::cout << "VariableAccess " << n.name << " ";
+            },
+            [](const UnaryOpNode& n) {
+                std::cout << "UnaryOpNode(" << n.op;
+                print_node(*n.operand);
+                std::cout << ") ";
             }
         }, node);
 }

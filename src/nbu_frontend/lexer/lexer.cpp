@@ -16,19 +16,32 @@ std::unordered_map<char, TokenType> SymboleTable{
     {'|', TokenType::OR},
     {'^', TokenType::XOR},
     {'~', TokenType::NOT},
-    {'!', TokenType::EXCLAMATION}
+    {'!', TokenType::EXCLAMATION},
+    {'=', TokenType::EQUAL},
+    {';', TokenType::SEMICOLON},
+    {'<', TokenType::LT},
+    {'>', TokenType::MT}
 };
 
-std::unordered_map<std::string_view, TokenType> map{
+std::unordered_map<std::string, TokenType> KeywordMap{
     {"return", TokenType::RETURN},
     {"<<", TokenType::SHIFTL},
-    {">>", TokenType::SHIFTR}
+    {">>", TokenType::SHIFTR},
+    {"int32", TokenType::INT32},
+    {"uint32", TokenType::UINT32},
+    {"&&", TokenType::ANDAND},
+    {"||", TokenType::OROR},
+    {"^^", TokenType::XORXOR},
+    {"<=", TokenType::LTE},
+    {">=", TokenType::MTE},
+    {"==", TokenType::EQUALEQUAL},
+    {"!=", TokenType::DIFFERENT}
 };
 
 std::ostream &operator<<(std::ostream &os, TokenType token) {
   switch (token) {
   case TokenType::INT_SIGNED_32:
-    os << "int";
+    os << "valInt32";
     break;
   case TokenType::STAR:
     os << "*";
@@ -59,6 +72,7 @@ std::ostream &operator<<(std::ostream &os, TokenType token) {
     break;
   case TokenType::PERCENT:
     os << "%";
+    break;
   case TokenType::OR:
     os << "|";
     break;
@@ -74,6 +88,45 @@ std::ostream &operator<<(std::ostream &os, TokenType token) {
   case TokenType::SHIFTR:
     os << ">>";
     break;
+  case TokenType::IDENTIFIER:
+    os << "identifier";
+    break;
+  case TokenType::INT32:
+    os << "int32";
+    break;
+  case TokenType::UINT32:
+    os << "uint32";
+    break;
+  case TokenType::EQUAL:
+    os << "=";
+    break;
+  case TokenType::EQUALEQUAL:
+    os << "==";
+    break;
+  case TokenType::DIFFERENT:
+    os << "!=";
+    break;
+  case TokenType::LT:
+    os << "<";
+    break;
+  case TokenType::MT:
+    os << ">";
+    break;
+  case TokenType::LTE:
+    os << "<=";
+    break;
+  case TokenType::MTE:
+    os << ">=";
+    break;
+  case TokenType::ANDAND:
+    os << "&&";
+    break;
+  case TokenType::OROR:
+    os << "||";
+    break;
+  case TokenType::XORXOR:
+    os << "^^";
+    break;
   default:
     os << "TODO";
     break;
@@ -84,8 +137,8 @@ std::ostream &operator<<(std::ostream &os, TokenType token) {
 std::vector<Token> lexer(std::ifstream &file) {
   std::vector<Token> tokens;
   std::string word;
-  unsigned int column;
-  unsigned int line;
+  unsigned int column = 1;
+  unsigned int line = 1;
 
   State state = State::START;
   char c;
@@ -94,9 +147,10 @@ std::vector<Token> lexer(std::ifstream &file) {
     if (word.empty())
       return;
     if (state == State::TEXT) {
-      if (map.find(word) == map.end())
-        throw std::runtime_error("Unknown keyword");
-      tokens.emplace_back(map[word],word,column,line);
+      if (KeywordMap.find(word) == KeywordMap.end())
+        tokens.emplace_back(TokenType::IDENTIFIER,word,column,line);
+      else
+        tokens.emplace_back(KeywordMap[word],word,column,line);
     }
     else if (state == State::NUMBER) 
       tokens.emplace_back(TokenType::INT_SIGNED_32,word,column,line);
@@ -105,17 +159,33 @@ std::vector<Token> lexer(std::ifstream &file) {
     state = State::START;
   };
 
+  auto handle_symbole = [&]() {
+    char tmpc;
+    if (file.get(tmpc)) {
+      std::string tmp = std::string(1,c)+tmpc;
+      if (KeywordMap.find(tmp) != KeywordMap.end()) {
+        tokens.emplace_back(KeywordMap[tmp], tmp, column, line);
+        column += 2;
+        return;
+      }
+    }
+    tokens.emplace_back(SymboleTable[c],std::string(1,c),column,line);
+    ++column;
+    file.unget();
+  };
+
   while (file.get(c)) {
     if (c == '\n') {
-      column = 0;
+      column = 1;
       line += 1;
     }
     switch (state) {
     case State::START:
-      if (std::isspace(c))
+      if (std::isspace(c)) {
         continue;
-      if (c == ';') {
-        tokens.emplace_back(TokenType::SEMICOLON,word,column,line);
+      }
+      if (SymboleTable.find(c) != SymboleTable.end()) {
+        handle_symbole();
         continue;
       }
       state = std::isdigit(c) ? State::NUMBER : State::TEXT;
@@ -127,8 +197,8 @@ std::vector<Token> lexer(std::ifstream &file) {
       else {
         flush_token();
 
-        if (c == ';')
-          tokens.emplace_back(TokenType::SEMICOLON,word,column,line);
+        if (SymboleTable.find(c) != SymboleTable.end())
+          handle_symbole();
         else if (!std::isspace(c)) {
           state = State::TEXT;
           word += c;
@@ -136,12 +206,12 @@ std::vector<Token> lexer(std::ifstream &file) {
       }
       break;
     case State::TEXT:
-      if (std::isalpha(c))
+      if (std::isalnum(c))
         word += c;
       else {
         flush_token();
-        if (c == ';')
-          tokens.emplace_back(TokenType::SEMICOLON,word,column,line);
+        if (SymboleTable.find(c) != SymboleTable.end())
+          handle_symbole();
         else if (!std::isspace(c)) {
           state = std::isdigit(c) ? State::NUMBER : State::TEXT;
           word += c;
@@ -153,7 +223,7 @@ std::vector<Token> lexer(std::ifstream &file) {
 
   flush_token();
 
-  tokens.emplace_back(TokenType::EOFTOKEN,"",column,line);
+  tokens.emplace_back(TokenType::EOFTOKEN,"\0",column,line);
 
   return tokens;
 }
