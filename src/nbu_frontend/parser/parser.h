@@ -70,6 +70,16 @@ struct FuncStmtNode {
     std::unique_ptr<ASTNode> code;
 };
 
+struct FuncCallStmtNode {
+    std::string name;
+    std::list<std::unique_ptr<ASTNode>> callParameters;
+};
+
+struct VariableModNode {
+    std::string name;
+    std::unique_ptr<ASTNode> info;
+};
+
 struct SymboleInfo {
     TokenType type;
     unsigned int stack_offset;
@@ -111,6 +121,7 @@ class Parser {
     inline const Token& peek();
     Token consume(TokenType expected);
     ASTNode parse_sentence();
+    ASTNode parse_identifier_sentence();
     ASTNode parse_return_sentence();
     ASTNode parse_local_variable_sentence();
     ASTNode parse_global_variable(const std::string& name, TokenType type);

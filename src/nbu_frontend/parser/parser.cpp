@@ -39,11 +39,24 @@ ASTNode Parser::parse_sentence() {
         return parse_local_variable_sentence();
     else if (peek().type == TokenType::IF)
         return parse_if_sentence();
+    else if (peek().type == TokenType::IDENTIFIER)
+        return parse_identifier_sentence();
     else {
         std::cerr << "Received : " << peek().type << "\n";
         std::cerr << "Error on line : " << peek().line << " column : " << peek().column << "\n";
     }
     std::exit(1);
+}
+
+ASTNode Parser::parse_identifier_sentence() {
+    std::string name = peek().val;
+    consume(TokenType::IDENTIFIER);
+    if (peek().type == TokenType::LPARAM) {
+        consume(TokenType::LPARAM);
+    }
+    else {
+        consume(TokenType::EQUAL);
+    }
 }
 
 ASTNode Parser::parse_if_sentence() {

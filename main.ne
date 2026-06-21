@@ -1,7 +1,7 @@
 float32 cart = 12.2;
 
-uint32 test()
-    return 3;
+uint32 test(int64 i)
+    return i;
 
 int32 main() {
     int32 x = 2*2/3;
