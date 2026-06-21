@@ -41,8 +41,14 @@ enum class TokenType {
     RPARAM, //done
     LBRAK, //done
     RBRAK, //done
-    FUNC, //done
     COMMA, //done
+    FLOAT64, //done
+    UFLOAT64, //done
+    FLOAT32, //done
+    UFLOAT32, //done
+    INT64, //done
+    UINT64, //done
+    FLOAT_SIGNED_32, //done
     EOFTOKEN //done
 };
 

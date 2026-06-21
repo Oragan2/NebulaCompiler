@@ -2,7 +2,6 @@
 #include <cctype>
 #include <iostream>
 #include <string>
-#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -43,7 +42,12 @@ std::unordered_map<std::string, TokenType> KeywordMap{
     {"!=", TokenType::DIFFERENT},
     {"if", TokenType::IF},
     {"else", TokenType::ELSE},
-    {"func", TokenType::FUNC}
+    {"float32", TokenType::FLOAT32},
+    {"ufloat32", TokenType::UFLOAT32},
+    {"float64", TokenType::FLOAT64},
+    {"ufloat64", TokenType::UFLOAT64},
+    {"int64", TokenType::INT64},
+    {"uint64", TokenType::UINT64}
 };
 
 std::ostream &operator<<(std::ostream &os, TokenType token) {
@@ -153,11 +157,29 @@ std::ostream &operator<<(std::ostream &os, TokenType token) {
   case TokenType::RBRAK:
     os << "}";
     break;
-  case TokenType::FUNC:
-    os << "func";
-    break;
   case TokenType::COMMA:
     os << ",";
+    break;
+  case TokenType::FLOAT32:
+    os << "float32";
+    break;
+  case TokenType::UFLOAT32:
+    os << "ufloat32";
+    break;
+  case TokenType::FLOAT64:
+    os << "float64";
+    break;
+  case TokenType::UFLOAT64:
+    os << "ufloat64";
+    break;
+  case TokenType::INT64:
+    os << "int64";
+    break;
+  case TokenType::UINT64:
+    os << "uint64";
+    break;
+  case TokenType::FLOAT_SIGNED_32:
+    os << "valFloat32";
     break;
   default:
     os << "TODO";
@@ -184,8 +206,12 @@ std::vector<Token> lexer(std::ifstream &file) {
       else
         tokens.emplace_back(KeywordMap[word],word,column,line);
     }
-    else if (state == State::NUMBER) 
-      tokens.emplace_back(TokenType::INT_SIGNED_32,word,column,line);
+    else if (state == State::NUMBER) {
+      if (word.find('.') > word.length())
+      	tokens.emplace_back(TokenType::INT_SIGNED_32,word,column,line);
+      else
+        tokens.emplace_back(TokenType::FLOAT_SIGNED_32,word,column,line);
+    }
     column += word.length();
     word.clear();
     state = State::START;
@@ -224,7 +250,7 @@ std::vector<Token> lexer(std::ifstream &file) {
       word += c;
       break;
     case State::NUMBER:
-      if (std::isdigit(c))
+      if (std::isdigit(c) || c == '.')
         word += c;
       else {
         flush_token();

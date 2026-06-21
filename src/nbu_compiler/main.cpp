@@ -59,9 +59,12 @@ void print_node(const ASTNode& node) {
                 std::cout << "func " << n.retType << "(";
                 for(const auto& m : n.parameters)
                     print_node(*m);
-                std::cout << ")";
+                std::cout << ") ";
                 print_node(*n.code);
-            }
+            },
+	    [](const FLoat32LiteralNode& n) {
+	    	std::cout << "Float " << n.value << " ";
+	    }
         }, node);
 }
 

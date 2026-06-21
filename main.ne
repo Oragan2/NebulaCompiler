@@ -1,7 +1,9 @@
-func uint32 test()
+float32 cart = 12.2;
+
+uint32 test()
     return 3;
 
-func int32 main() {
+int32 main() {
     int32 x = 2*2/3;
     int32 y = x+1;
     int32 z = ~y;

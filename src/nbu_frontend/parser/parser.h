@@ -11,6 +11,7 @@
 
 using ASTNode = std::variant<
     struct Int32LiteralNode,
+    struct FLoat32LiteralNode,
     struct ReturnStmtNode,
     struct BinaryOpNode,
     struct VariableDeclare,
@@ -23,6 +24,10 @@ using ASTNode = std::variant<
 
 struct Int32LiteralNode {
     int32_t value;
+};
+
+struct FLoat32LiteralNode {
+    float value;
 };
 
 struct ReturnStmtNode {
@@ -103,14 +108,15 @@ class Parser {
     std::map<std::string, SymboleInfo> GlobalSymboleTable;
     FunctionInfo currentFunc;
 
-    inline Token peek();
+    inline const Token& peek();
     Token consume(TokenType expected);
     ASTNode parse_sentence();
     ASTNode parse_return_sentence();
     ASTNode parse_local_variable_sentence();
+    ASTNode parse_global_variable(const std::string& name, TokenType type);
     ASTNode parse_if_sentence();
     ASTNode parse_block();
-    ASTNode parse_function();
+    ASTNode parse_function(const std::string& name, TokenType retValue);
     ASTNode parse_parameter();
     ASTNode parse_expression(int precedence);
     ASTNode parse_primary();
