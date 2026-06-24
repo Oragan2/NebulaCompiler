@@ -11,7 +11,7 @@
 
 using ASTNode = std::variant<
     struct Int32LiteralNode,
-    struct FLoat32LiteralNode,
+    struct Float32LiteralNode,
     struct ReturnStmtNode,
     struct BinaryOpNode,
     struct VariableDeclare,
@@ -19,14 +19,16 @@ using ASTNode = std::variant<
     struct UnaryOpNode,
     struct IfStmtNode,
     struct BlockStmtNode,
-    struct FuncStmtNode
+    struct FuncStmtNode,
+    struct FuncCallStmtNode,
+    struct VariableModNode
 >;
 
 struct Int32LiteralNode {
     int32_t value;
 };
 
-struct FLoat32LiteralNode {
+struct Float32LiteralNode {
     float value;
 };
 
@@ -88,6 +90,7 @@ struct SymboleInfo {
 struct FunctionInfo {
     TokenType retType;
     std::map<std::string, SymboleInfo> LocalSymboleTable;
+    std::vector<TokenType> paramType;
 };
 
 enum Precedence {
@@ -122,6 +125,7 @@ class Parser {
     Token consume(TokenType expected);
     ASTNode parse_sentence();
     ASTNode parse_identifier_sentence();
+    ASTNode parse_function_call(const std::string& name);
     ASTNode parse_return_sentence();
     ASTNode parse_local_variable_sentence();
     ASTNode parse_global_variable(const std::string& name, TokenType type);

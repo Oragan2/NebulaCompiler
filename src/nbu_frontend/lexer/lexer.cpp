@@ -43,9 +43,7 @@ std::unordered_map<std::string, TokenType> KeywordMap{
     {"if", TokenType::IF},
     {"else", TokenType::ELSE},
     {"float32", TokenType::FLOAT32},
-    {"ufloat32", TokenType::UFLOAT32},
     {"float64", TokenType::FLOAT64},
-    {"ufloat64", TokenType::UFLOAT64},
     {"int64", TokenType::INT64},
     {"uint64", TokenType::UINT64}
 };
@@ -163,14 +161,8 @@ std::ostream &operator<<(std::ostream &os, TokenType token) {
   case TokenType::FLOAT32:
     os << "float32";
     break;
-  case TokenType::UFLOAT32:
-    os << "ufloat32";
-    break;
   case TokenType::FLOAT64:
     os << "float64";
-    break;
-  case TokenType::UFLOAT64:
-    os << "ufloat64";
     break;
   case TokenType::INT64:
     os << "int64";

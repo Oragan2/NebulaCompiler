@@ -62,10 +62,22 @@ void print_node(const ASTNode& node) {
                 std::cout << ") ";
                 print_node(*n.code);
             },
-	    [](const FLoat32LiteralNode& n) {
-	    	std::cout << "Float " << n.value << " ";
-	    }
-        }, node);
+            [](const Float32LiteralNode& n) {
+                std::cout << "Float " << n.value << " ";
+            },
+            [](const FuncCallStmtNode& n) {
+                std::cout << "Function call " << n.name << "(";
+                for (const auto& param : n.callParameters) {
+                    print_node(*param);
+                    std::cout << "";
+                }
+                std::cout << ")";
+            },
+            [](const VariableModNode& n) {
+                std::cout << "VariableModification " << n.name << " ";
+                print_node(*n.info);
+            }
+            }, node);
 }
 
 void print_tree(const std::vector<ASTNode>& astnodes) {
