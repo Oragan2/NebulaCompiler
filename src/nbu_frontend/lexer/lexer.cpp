@@ -51,141 +51,105 @@ std::unordered_map<std::string, TokenType> KeywordMap{
 };
 
 std::ostream &operator<<(std::ostream &os, TokenType token) {
+  os << token_to_str(token);
+  return os;
+}
+
+std::string operator+(const std::string& str, TokenType token) {
+  return str+token_to_str(token);
+}
+
+std::string token_to_str(TokenType token) {
   switch (token) {
   case TokenType::INT_SIGNED_32:
-    os << "valInt32";
-    break;
+    return "valInt32";
   case TokenType::STAR:
-    os << "*";
-    break;
+    return "*";
   case TokenType::PLUS:
-    os << "+";
-    break;
+    return "+";
   case TokenType::RETURN:
-    os << "return";
-    break;
+    return "return";
   case TokenType::SEMICOLON:
-    os << ";";
-    break;
+    return ";";
   case TokenType::EOFTOKEN:
-    os << "EOF";
-    break;
+    return "EOF";
   case TokenType::EXCLAMATION:
-    os << "!";
-    break;
+    return "!";
   case TokenType::AND:
-    os << "&";
-    break;
+    return "&";
   case TokenType::MINUS:
-    os << "-";
-    break;
+    return "-";
   case TokenType::SLASH:
-    os << "/";
-    break;
+    return "/";
   case TokenType::PERCENT:
-    os << "%";
-    break;
+    return "%";
   case TokenType::OR:
-    os << "|";
-    break;
+    return "|";
   case TokenType::XOR:
-    os << "^";
-    break;
+    return "^";
   case TokenType::NOT:
-    os << "~";
-    break;
+    return "~";
   case TokenType::SHIFTL:
-    os << "<<";
-    break;
+    return "<<";
   case TokenType::SHIFTR:
-    os << ">>";
-    break;
+    return ">>";
   case TokenType::IDENTIFIER:
-    os << "identifier";
-    break;
+    return "identifier";
   case TokenType::INT32:
-    os << "int32";
-    break;
+    return "int32";
   case TokenType::UINT32:
-    os << "uint32";
-    break;
+    return "uint32";
   case TokenType::EQUAL:
-    os << "=";
-    break;
+    return "=";
   case TokenType::EQUALEQUAL:
-    os << "==";
-    break;
+    return "==";
   case TokenType::DIFFERENT:
-    os << "!=";
-    break;
+    return "!=";
   case TokenType::LT:
-    os << "<";
-    break;
+    return "<";
   case TokenType::MT:
-    os << ">";
-    break;
+    return ">";
   case TokenType::LTE:
-    os << "<=";
-    break;
+    return "<=";
   case TokenType::MTE:
-    os << ">=";
-    break;
+    return ">=";
   case TokenType::ANDAND:
-    os << "&&";
-    break;
+    return "&&";
   case TokenType::OROR:
-    os << "||";
-    break;
+    return "||";
   case TokenType::XORXOR:
-    os << "^^";
-    break;
+    return "^^";
   case TokenType::IF:
-    os << "if";
-    break;
+    return "if";
   case TokenType::ELSE:
-    os << "else";
-    break;
+    return "else";
   case TokenType::LPARAM:
-    os << "(";
-    break;
+    return "(";
   case TokenType::RPARAM:
-    os << ")";
-    break;
+    return ")";
   case TokenType::LBRAK:
-    os << "{";
-    break;
+    return "{";
   case TokenType::RBRAK:
-    os << "}";
-    break;
+    return "}";
   case TokenType::COMMA:
-    os << ",";
-    break;
+    return ",";
   case TokenType::FLOAT32:
-    os << "float32";
-    break;
+    return "float32";
   case TokenType::FLOAT64:
-    os << "float64";
-    break;
+    return "float64";
   case TokenType::INT64:
-    os << "int64";
-    break;
+    return "int64";
   case TokenType::UINT64:
-    os << "uint64";
-    break;
+    return "uint64";
   case TokenType::FLOAT_SIGNED_32:
-    os << "valFloat32";
-    break;
+    return "valFloat32";
   case TokenType::VADDR:
-    os << "vaddr";
-    break;
+    return "vaddr";
   case TokenType::PADDR:
-    os << "paddr";
-    break;
+    return "paddr";
   default:
-    os << "TODO";
-    break;
+    return "TODO";
   }
-  return os;
 }
 
 std::vector<Token> lexer(std::ifstream &file) {

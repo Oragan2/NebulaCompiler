@@ -124,6 +124,8 @@ class Parser {
 
     inline const Token& peek();
     Token consume(TokenType expected);
+    void print_error(const std::string& msg);
+    void print_warning(const std::string& msg);
     ASTNode parse_sentence();
     ASTNode parse_identifier_sentence();
     ASTNode parse_function_call(const std::string& name);

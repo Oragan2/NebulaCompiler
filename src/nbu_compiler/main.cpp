@@ -47,7 +47,7 @@ void print_node(const ASTNode& node) {
                 }
             },
             [](const BlockStmtNode& n) {
-                std::cout << "{\n\t";
+                std::cout << "{\n";
                 for (const auto& sentence : n.codes) {
                     std::cout << "\t";
                     print_node(*sentence);

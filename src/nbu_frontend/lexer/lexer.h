@@ -66,4 +66,6 @@ enum class State { START, TEXT, NUMBER };
 
 std::vector<Token> lexer(std::ifstream& file);
 std::ostream& operator<<(std::ostream& os, TokenType token); 
+std::string operator+(const std::string& str, TokenType token);
+std::string token_to_str(TokenType token);
 #endif

@@ -26,10 +26,7 @@ Token Parser::consume(TokenType expected) {
     if (expected == peek().type) {
         return tokens[cursor++];
     }
-    std::cerr << "Received : " << peek().type << "\n";
-    std::cerr << "Expected : " << expected << "\n";
-    std::cerr << "Error on line : " << peek().line << " column : " << peek().column << "\n";
-    std::exit(1);
+    print_error((std::string)"Received : "+peek().type+" Expected "+expected);
 }
 
 ASTNode Parser::parse_sentence() {
@@ -42,10 +39,8 @@ ASTNode Parser::parse_sentence() {
     else if (peek().type == TokenType::IDENTIFIER)
         return parse_identifier_sentence();
     else {
-        std::cerr << "Received : " << peek().type << "\n";
-        std::cerr << "Error on line : " << peek().line << " column : " << peek().column << "\n";
+        print_error("Unknow keyword : "+peek().val);
     }
-    std::exit(1);
 }
 
 ASTNode Parser::parse_function_call(const std::string& name) {
@@ -64,9 +59,7 @@ ASTNode Parser::parse_function_call(const std::string& name) {
 ASTNode Parser::parse_identifier_sentence() {
     std::string name = peek().val;
     if (!(GlobalSymboleTable.contains(name) || currentFunc.LocalSymboleTable.contains(name) || functions.contains(name))) {
-        std::cerr << "Unknown identifier " << name << " on" << std::endl;
-        std::cerr << "Line : " << peek().line << " and Column : " << peek().column << std::endl;
-        std::exit(1);
+        print_error("Symbole : "+peek().val+" unknown");
     } 
     consume(TokenType::IDENTIFIER);
     if (peek().type == TokenType::LPARAM) {
@@ -157,9 +150,7 @@ ASTNode Parser::parse_primary() {
         return parse_function_call(name);
     }
     else if (peek().type == TokenType::IDENTIFIER) {
-        std::cerr << "Symbole : " << peek().val << " not declared\n";
-        std::cerr << "Error line : " << peek().line << " column : " << peek().column << "\n";
-	std::exit(1);
+        print_error("Symbole : "+peek().val+" unknown");
     }
     else {
 	if (peek().type == TokenType::INT_SIGNED_32)
@@ -243,9 +234,7 @@ std::vector<ASTNode> Parser::parse() {
     Token token = peek();
     while (token.type != TokenType::EOFTOKEN) {
         if (typeTable.find(peek().type) == typeTable.end()) { // support variable & function declarations
-            std::cerr << "Error only functions or global variable allowed at file level";
-            std::cerr << "Line : " << token.line << " Column : " << token.column << "\n";
-            return astnodes;
+            print_error("Only variables or functions can be declared at file root level");
         }
         else {
 	    TokenType type = peek().type;
@@ -277,8 +266,7 @@ ASTNode Parser::parse_global_variable(const std::string& name, TokenType type) {
 ASTNode Parser::parse_parameter() {
     VariableDeclare ret;
     if (typeTable.find(peek().type) == typeTable.end()) {
-        std::cerr << "Unkown type : " << peek().type << "\n";
-        std::cerr << "Line : " << peek().line << " Column : " << peek().column << "\n";
+        print_error("Unknown type : "+peek().val);
     }
     ret.type = peek().type;
     consume(peek().type);
@@ -315,4 +303,15 @@ ASTNode Parser::parse_function(const std::string& name, TokenType retValue) {
         ret.code = std::make_unique<ASTNode>(std::move(parse_sentence()));
     functions.emplace(name, currentFunc);
     return ret; 
+}
+
+void Parser::print_error(const std::string& msg) {
+    std::cerr << "Error : " << msg << std::endl;
+    std::cerr << "Line : " << peek().line << " Column : " << peek().column << std::endl;
+    std::exit(1);
+}
+
+void Parser::print_warning(const std::string& msg) {
+    std::cerr << "Warning : " << msg << std::endl;
+    std::cerr << "Line : " << peek().line << " Column : " << peek().column << std::endl;
 }
