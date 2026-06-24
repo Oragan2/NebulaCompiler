@@ -38,6 +38,7 @@ struct ReturnStmtNode {
 
 struct BinaryOpNode {
     TokenType op;
+    TokenType precision;
     std::unique_ptr<ASTNode> left;
     std::unique_ptr<ASTNode> right;
 };
@@ -53,6 +54,7 @@ struct VariableAccess {
 
 struct UnaryOpNode {
     TokenType op;
+    TokenType precision;
     std::unique_ptr<ASTNode> operand;
 };
 
@@ -138,6 +140,8 @@ class Parser {
     ASTNode parse_parameter();
     ASTNode parse_expression(int precedence);
     ASTNode parse_primary();
+    TokenType type_precision(const ASTNode& node);
+    TokenType resolve_type(TokenType left, TokenType right);
 };
 
 #endif

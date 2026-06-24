@@ -1,11 +1,15 @@
 #include "parser.h"
 #include "../lexer/lexer.h"
+#include <cstddef>
 #include <cstdlib>
 #include <unordered_set>
 #include <vector>
 #include <iostream>
 #include <map>
 #include <string>
+
+template<class... Ts> struct overloads : Ts... { using Ts::operator()...; };
+template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 
 Parser::Parser(const std::vector<Token>& tokens) : tokens{tokens}, cursor{0} {}
 
@@ -47,7 +51,11 @@ ASTNode Parser::parse_function_call(const std::string& name) {
     const FunctionInfo& func = functions[name];
     FuncCallStmtNode ret;
     for (int i = 0; i < func.paramType.size(); ++i) {
-        ret.callParameters.push_back(std::make_unique<ASTNode>(std::move(parse_expression(Precedence::LOWEST))));
+        ASTNode expr = parse_expression(Precedence::LOWEST);
+        TokenType precision = type_precision(expr);
+        if (precision != func.paramType[i])
+            print_error("Argument type given is : "+precision+" but expected : "+func.paramType[i]); // TODO change into a warning when type promotion be a thing
+        ret.callParameters.push_back(std::make_unique<ASTNode>(std::move(expr)));
         if (i+1 != func.paramType.size())
             consume(TokenType::COMMA);
     }
@@ -72,7 +80,12 @@ ASTNode Parser::parse_identifier_sentence() {
         consume(TokenType::EQUAL);
         VariableModNode ret;
         ret.name = name;
-        ret.info = std::make_unique<ASTNode>(std::move(parse_expression(Precedence::LOWEST)));
+        ASTNode expr = parse_expression(Precedence::LOWEST);
+        TokenType precision = type_precision(expr);
+        SymboleInfo a = GlobalSymboleTable.contains(name) ? GlobalSymboleTable.at(name) : currentFunc.LocalSymboleTable.at(name);
+        if (precision != a.type)
+            print_error("Error missmatched type for "+name+" of type "+a.type+" but given "+precision); // TODO : Will be changed to a warning when type promotion is a thing
+        ret.info = std::make_unique<ASTNode>(std::move(expr));
         consume(TokenType::SEMICOLON);
         return ret;
     }
@@ -135,6 +148,9 @@ ASTNode Parser::parse_return_sentence() {
     consume(TokenType::RETURN);
     ASTNode expr = parse_expression(Precedence::LOWEST);
     consume(TokenType::SEMICOLON);
+
+    if (type_precision(expr) != currentFunc.retType)
+        print_error("Return type mismatch Given : "+currentFunc.retType+" Expected : "+type_precision(expr)); // TODO will be changed to a warning later when type promotion will be taken in effect
 
     return ReturnStmtNode{std::make_unique<ASTNode>(std::move(expr))};
 }
@@ -212,7 +228,9 @@ ASTNode Parser::parse_expression(int precedence) {
 
         ASTNode operand = parse_expression(Precedence::PREFIX);
 
-        left = UnaryOpNode{token.type, std::make_unique<ASTNode>(std::move(operand))};
+        TokenType precision = type_precision(operand);
+
+        left = UnaryOpNode{token.type, precision, std::make_unique<ASTNode>(std::move(operand))};
     } else {
         left = parse_primary();
     }
@@ -223,7 +241,8 @@ ASTNode Parser::parse_expression(int precedence) {
 
         ASTNode right = parse_expression(get_token_precedence(op.type));
 
-        left = BinaryOpNode{op.type,std::make_unique<ASTNode>(std::move(left)),std::make_unique<ASTNode>(std::move(right))};
+        TokenType precision = resolve_type(type_precision(left), type_precision(right));
+        left = BinaryOpNode{op.type,precision,std::make_unique<ASTNode>(std::move(left)),std::make_unique<ASTNode>(std::move(right))};
     }
 
     return left;
@@ -314,4 +333,31 @@ void Parser::print_error(const std::string& msg) {
 void Parser::print_warning(const std::string& msg) {
     std::cerr << "Warning : " << msg << std::endl;
     std::cerr << "Line : " << peek().line << " Column : " << peek().column << std::endl;
+}
+
+TokenType Parser::type_precision(const ASTNode& node) {
+    return std::visit(overloads {
+        [this](const Int32LiteralNode& n) {return TokenType::INT32;},
+        [this](const Float32LiteralNode& n) {return TokenType::FLOAT32;},
+        [this](const VariableAccess& n) {
+            if (currentFunc.LocalSymboleTable.contains(n.name))
+                return currentFunc.LocalSymboleTable.at(n.name).type;
+            else
+                return GlobalSymboleTable.at(n.name).type;
+        },
+        [this](const BinaryOpNode& n) {return resolve_type(type_precision(*n.left), type_precision(*n.right));},
+        [this](const UnaryOpNode& n) {return type_precision(*n.operand);},
+        [this](const FuncCallStmtNode& n) {return functions.at(n.name).retType;},
+        [this](const auto&) {print_error("Uh?"); return TokenType::EOFTOKEN;}
+    }, node);
+}
+
+TokenType Parser::resolve_type(TokenType left, TokenType right) {
+    if (left == right) return left;
+    if (left == TokenType::FLOAT64 || right == TokenType::FLOAT64) return TokenType::FLOAT64; 
+    if (left == TokenType::FLOAT32 || right == TokenType::FLOAT32) return TokenType::FLOAT32; 
+    if (left == TokenType::UINT64 || right == TokenType::UINT64) return TokenType::UINT64; 
+    if (left == TokenType::INT64 || right == TokenType::INT64) return TokenType::INT64; 
+    if (left == TokenType::UINT32 || right == TokenType::UINT32) return TokenType::UINT32; 
+    return TokenType::INT32;
 }
