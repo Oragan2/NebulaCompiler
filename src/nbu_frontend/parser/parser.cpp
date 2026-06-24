@@ -15,7 +15,9 @@ std::unordered_set<TokenType> typeTable {
     TokenType::INT64,
     TokenType::UINT64,
     TokenType::FLOAT32,
-    TokenType::FLOAT64
+    TokenType::FLOAT64,
+    TokenType::VADDR,
+    TokenType::PADDR
 };
 
 inline const Token& Parser::peek() { return tokens[cursor]; }

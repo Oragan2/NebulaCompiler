@@ -47,6 +47,8 @@ enum class TokenType {
     INT64, //done
     UINT64, //done
     FLOAT_SIGNED_32, //done
+    VADDR, //done
+    PADDR, //done
     EOFTOKEN //done
 };
 

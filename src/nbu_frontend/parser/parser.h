@@ -115,6 +115,7 @@ class Parser {
     Parser(const std::vector<Token>& tokens);
     
     private:
+    Parser();
     std::vector<Token> tokens;
     unsigned int cursor;
     std::map<std::string, FunctionInfo> functions;

@@ -45,7 +45,9 @@ std::unordered_map<std::string, TokenType> KeywordMap{
     {"float32", TokenType::FLOAT32},
     {"float64", TokenType::FLOAT64},
     {"int64", TokenType::INT64},
-    {"uint64", TokenType::UINT64}
+    {"uint64", TokenType::UINT64},
+    {"vaddr", TokenType::VADDR},
+    {"paddr", TokenType::PADDR}
 };
 
 std::ostream &operator<<(std::ostream &os, TokenType token) {
@@ -172,6 +174,12 @@ std::ostream &operator<<(std::ostream &os, TokenType token) {
     break;
   case TokenType::FLOAT_SIGNED_32:
     os << "valFloat32";
+    break;
+  case TokenType::VADDR:
+    os << "vaddr";
+    break;
+  case TokenType::PADDR:
+    os << "paddr";
     break;
   default:
     os << "TODO";
