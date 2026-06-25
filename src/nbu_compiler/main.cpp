@@ -90,6 +90,9 @@ void print_node(const ASTNode& node) {
                 print_node(*n.addr);
                 std::cout << " as ";
                 print_node(*n.value);
+            },
+            [](const asmNode& n) {
+                std::cout << "asm {" << n.rawAsm << "}";
             }
             }, node);
 }

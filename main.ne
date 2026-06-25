@@ -17,5 +17,8 @@ int32 main() {
     vaddr data = 123;
     write32(data,32);
     x = read32(data);
+    asm {
+        xor rax, rax
+    }
     return z+y;
 }

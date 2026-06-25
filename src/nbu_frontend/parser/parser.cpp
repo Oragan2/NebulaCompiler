@@ -53,9 +53,21 @@ ASTNode Parser::parse_sentence() {
         return parse_if_sentence();
     else if (peek().type == TokenType::IDENTIFIER)
         return parse_identifier_sentence();
+    else if (peek().type == TokenType::ASM)
+        return parse_asm();
     else {
         print_error("Unknow keyword : "+peek().val);
     }
+}
+
+ASTNode Parser::parse_asm() {
+    asmNode ret;
+    consume(TokenType::ASM);
+    consume(TokenType::LBRAK);
+    ret.rawAsm = peek().val;
+    consume(TokenType::ASM_INSTRUCTIONS);
+    consume(TokenType::RBRAK);
+    return ret;
 }
 
 ASTNode Parser::parse_function_call(const std::string& name) {

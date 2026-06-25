@@ -24,7 +24,8 @@ using ASTNode = std::variant<
     struct VariableModNode,
     struct PromotionNode,
     struct readAddrNode,
-    struct writeAddrNode
+    struct writeAddrNode,
+    struct asmNode
 >;
 
 struct Int32LiteralNode {
@@ -104,6 +105,10 @@ struct writeAddrNode {
     std::unique_ptr<ASTNode> value;
 };
 
+struct asmNode {
+    std::string rawAsm;
+};
+
 struct SymboleInfo {
     TokenType type;
     unsigned int stack_offset;
@@ -160,6 +165,7 @@ class Parser {
     ASTNode parse_parameter();
     ASTNode parse_expression(int precedence);
     ASTNode parse_primary();
+    ASTNode parse_asm();
     TokenType type_precision(const ASTNode& node);
     TokenType resolve_type(TokenType left, TokenType right);
     TokenType tryPromote(TokenType currentType, TokenType promoteTo);

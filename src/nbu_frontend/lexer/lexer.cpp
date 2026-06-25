@@ -47,7 +47,8 @@ std::unordered_map<std::string, TokenType> KeywordMap{
     {"int64", TokenType::INT64},
     {"uint64", TokenType::UINT64},
     {"vaddr", TokenType::VADDR},
-    {"paddr", TokenType::PADDR}
+    {"paddr", TokenType::PADDR},
+    {"asm", TokenType::ASM}
 };
 
 std::ostream &operator<<(std::ostream &os, TokenType token) {
@@ -147,6 +148,10 @@ std::string token_to_str(TokenType token) {
     return "vaddr";
   case TokenType::PADDR:
     return "paddr";
+  case TokenType::ASM:
+    return "asm";
+  case TokenType::ASM_INSTRUCTIONS:
+    return "asm instructions";
   default:
     return "TODO";
   }
@@ -230,6 +235,31 @@ std::vector<Token> lexer(std::ifstream &file) {
     case State::TEXT:
       if (std::isalnum(c))
         word += c;
+      else if (word == "asm") {
+        tokens.emplace_back(TokenType::ASM, word, column, line);
+        column += 3;
+        word.clear();
+
+        char next_c;
+        while (file.get(next_c) && std::isspace(next_c)) 
+          if (next_c == '\n') {column = 1; line++;} else {column++;}
+        
+        if (next_c == '{') {
+          tokens.emplace_back(TokenType::LBRAK, "{", column++, line);
+
+          std::string raw_asm;
+          while (file.get(next_c) && next_c != '}') {
+            raw_asm += next_c;
+            if (next_c == '\n') {column = 1; line++;} else {column++;};
+          }
+
+          tokens.emplace_back(TokenType::ASM_INSTRUCTIONS, raw_asm, column, line);
+          tokens.emplace_back(TokenType::RBRAK, "}", column, line);
+
+          state = State::START;
+          continue;
+        }
+      }
       else {
         flush_token();
         if (SymboleTable.find(c) != SymboleTable.end())
@@ -246,6 +276,6 @@ std::vector<Token> lexer(std::ifstream &file) {
   flush_token();
 
   tokens.emplace_back(TokenType::EOFTOKEN,"\0",column,line);
-
+  
   return tokens;
 }

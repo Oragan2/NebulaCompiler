@@ -49,6 +49,8 @@ enum class TokenType {
     FLOAT_SIGNED_32, //done
     VADDR, //done
     PADDR, //done
+    ASM, // done
+    ASM_INSTRUCTIONS, // done
     EOFTOKEN //done
 };
 
