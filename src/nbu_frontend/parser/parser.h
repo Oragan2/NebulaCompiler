@@ -22,7 +22,9 @@ using ASTNode = std::variant<
     struct FuncStmtNode,
     struct FuncCallStmtNode,
     struct VariableModNode,
-    struct PromotionNode
+    struct PromotionNode,
+    struct readAddrNode,
+    struct writeAddrNode
 >;
 
 struct Int32LiteralNode {
@@ -89,6 +91,17 @@ struct PromotionNode {
     TokenType topromote;
     TokenType was;
     std::unique_ptr<ASTNode> info;
+};
+
+struct readAddrNode {
+    std::unique_ptr<ASTNode> addr;
+    int8_t quantity;
+};
+
+struct writeAddrNode {
+    std::unique_ptr<ASTNode> addr;
+    int8_t quantity;
+    std::unique_ptr<ASTNode> value;
 };
 
 struct SymboleInfo {

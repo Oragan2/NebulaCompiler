@@ -24,13 +24,24 @@ std::unordered_set<TokenType> typeTable {
     TokenType::PADDR
 };
 
+std::unordered_set<std::string> readWriteNameTable {
+    "read8",
+    "read16",
+    "read32",
+    "read64",
+    "write64",
+    "write32",
+    "write16",
+    "write8"
+};
+
 inline const Token& Parser::peek() { return tokens[cursor]; }
 
 Token Parser::consume(TokenType expected) {
     if (expected == peek().type) {
         return tokens[cursor++];
     }
-    print_error((std::string)"Received : "+peek().type+" Expected "+expected);
+    print_error((std::string)"received "+peek().type+" Expected "+expected);
 }
 
 ASTNode Parser::parse_sentence() {
@@ -74,17 +85,17 @@ ASTNode Parser::parse_function_call(const std::string& name) {
 
 ASTNode Parser::parse_identifier_sentence() {
     std::string name = peek().val;
-    if (!(GlobalSymboleTable.contains(name) || currentFunc.LocalSymboleTable.contains(name) || functions.contains(name))) {
-        print_error("Symbole : "+peek().val+" unknown");
+    if (!(GlobalSymboleTable.contains(name) || currentFunc.LocalSymboleTable.contains(name) || functions.contains(name) || readWriteNameTable.contains(name))) {
+        print_error("symbole "+peek().val+" unknown");
     } 
     consume(TokenType::IDENTIFIER);
-    if (peek().type == TokenType::LPARAM) {
+    if (functions.contains(name)) {
         consume(TokenType::LPARAM);
         ASTNode ret = parse_function_call(name);
         consume(TokenType::SEMICOLON);
         return ret;
     }
-    else {
+    if (peek().type == TokenType::EQUAL) {
         consume(TokenType::EQUAL);
         VariableModNode ret;
         ret.name = name;
@@ -104,6 +115,32 @@ ASTNode Parser::parse_identifier_sentence() {
             ret.info = std::make_unique<ASTNode>(std::move(expr));
         consume(TokenType::SEMICOLON);
         return ret;
+    }
+    if (readWriteNameTable.contains(name)) {
+        consume(TokenType::LPARAM);
+        ASTNode addr = parse_expression(Precedence::LOWEST);
+        TokenType addrType = type_precision(addr);
+        if (addrType != TokenType::VADDR && addrType != TokenType::PADDR) {
+            print_error("Was not provided with an address type");
+        }
+        if (name.find("read") < name.size()) {
+            readAddrNode ret;
+            ret.quantity = std::stoi(name.data()+4);
+            ret.addr = std::make_unique<ASTNode>(std::move(addr));
+            consume(TokenType::RPARAM);
+            consume(TokenType::SEMICOLON);
+            return ret;
+        }
+        else {
+            writeAddrNode ret;
+            ret.quantity = std::stoi(name.data()+5);
+            ret.addr = std::make_unique<ASTNode>(std::move(addr));
+            consume(TokenType::COMMA);
+            ret.value = std::make_unique<ASTNode>(std::move(parse_expression(Precedence::LOWEST)));
+            consume(TokenType::RPARAM);
+            consume(TokenType::SEMICOLON);
+            return ret;
+        }
     }
 }
 
@@ -199,14 +236,34 @@ ASTNode Parser::parse_primary() {
         consume(TokenType::LPARAM);
         return parse_function_call(name);
     }
+    else if (readWriteNameTable.contains(peek().val)) {
+        std::string name = peek().val;
+        consume(TokenType::IDENTIFIER);
+        consume(TokenType::LPARAM);
+        ASTNode addr = parse_expression(Precedence::LOWEST);
+        TokenType addrType = type_precision(addr);
+        if (addrType != TokenType::VADDR && addrType != TokenType::PADDR) {
+            print_error("Was not provided with an address type");
+        }
+        if (name.find("read") < name.size()) {
+            readAddrNode ret;
+            ret.quantity = std::stoi(name.data()+4);
+            ret.addr = std::make_unique<ASTNode>(std::move(addr));
+            consume(TokenType::RPARAM);
+            return ret;
+        }
+        else {
+            print_error("A write doesn't return anything");
+        }
+    }
     else if (peek().type == TokenType::IDENTIFIER) {
         print_error("Symbole : "+peek().val+" unknown");
     }
     else {
-	if (peek().type == TokenType::INT_SIGNED_32)
-        return Int32LiteralNode{.value = std::stoi(consume(TokenType::INT_SIGNED_32).val)};
-	else
-	 	return Float32LiteralNode{.value = std::stof(consume(TokenType::FLOAT_SIGNED_32).val)}; 
+        if (peek().type == TokenType::INT_SIGNED_32)
+            return Int32LiteralNode{.value = std::stoi(consume(TokenType::INT_SIGNED_32).val)};
+        else
+            return Float32LiteralNode{.value = std::stof(consume(TokenType::FLOAT_SIGNED_32).val)}; 
     }
 }
 
@@ -390,6 +447,10 @@ TokenType Parser::type_precision(const ASTNode& node) {
         [this](const BinaryOpNode& n) {return resolve_type(type_precision(*n.left), type_precision(*n.right));},
         [this](const UnaryOpNode& n) {return type_precision(*n.operand);},
         [this](const FuncCallStmtNode& n) {return functions.at(n.name).retType;},
+        [this](const readAddrNode& n ) {
+            if (n.quantity == 64) return TokenType::UINT64;
+            if (n.quantity == 32) return TokenType::UINT32; // Will do the other when the time come
+        },
         [this](const auto&) {print_error("Uh?"); return TokenType::EOFTOKEN;}
     }, node);
 }
@@ -398,6 +459,8 @@ TokenType Parser::resolve_type(TokenType left, TokenType right) {
     if (left == right) return left;
     if (left == TokenType::FLOAT64 || right == TokenType::FLOAT64) return TokenType::FLOAT64; 
     if (left == TokenType::FLOAT32 || right == TokenType::FLOAT32) return TokenType::FLOAT32; 
+    if (left == TokenType::VADDR || right == TokenType::VADDR) return TokenType::VADDR;
+    if (left == TokenType::PADDR || right == TokenType::PADDR) return TokenType::PADDR;
     if (left == TokenType::UINT64 || right == TokenType::UINT64) return TokenType::UINT64; 
     if (left == TokenType::INT64 || right == TokenType::INT64) return TokenType::INT64; 
     if (left == TokenType::UINT32 || right == TokenType::UINT32) return TokenType::UINT32; 

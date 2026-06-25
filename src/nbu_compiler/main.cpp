@@ -29,7 +29,7 @@ void print_node(const ASTNode& node) {
                     print_node(*n.info);
             },
             [](const VariableAccess& n) {
-                std::cout << "VariableAccess " << n.name << " ";
+                std::cout << "VariableAccess " << n.name;
             },
             [](const UnaryOpNode& n) {
                 std::cout << "UnaryOpNode(" << n.op;
@@ -80,6 +80,16 @@ void print_node(const ASTNode& node) {
             [](const PromotionNode& n) {
                 std::cout << "Promotion from a " << n.was << " to a " << n.topromote << " ";
                 print_node(*n.info);
+            },
+            [](const readAddrNode& n) {
+                std::cout << "Read " << n.quantity/8 << " bytes from ";
+                print_node(*n.addr);
+            },
+            [](const writeAddrNode& n) {
+                std::cout << "Write " << n.quantity/8 << " bytes from ";
+                print_node(*n.addr);
+                std::cout << " as ";
+                print_node(*n.value);
             }
             }, node);
 }
