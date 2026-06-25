@@ -76,6 +76,10 @@ void print_node(const ASTNode& node) {
             [](const VariableModNode& n) {
                 std::cout << "VariableModification " << n.name << " ";
                 print_node(*n.info);
+            },
+            [](const PromotionNode& n) {
+                std::cout << "Promotion from a " << n.was << " to a " << n.topromote << " ";
+                print_node(*n.info);
             }
             }, node);
 }

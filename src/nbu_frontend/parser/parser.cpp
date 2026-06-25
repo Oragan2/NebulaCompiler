@@ -53,9 +53,17 @@ ASTNode Parser::parse_function_call(const std::string& name) {
     for (int i = 0; i < func.paramType.size(); ++i) {
         ASTNode expr = parse_expression(Precedence::LOWEST);
         TokenType precision = type_precision(expr);
-        if (precision != func.paramType[i])
-            print_error("Argument type given is : "+precision+" but expected : "+func.paramType[i]); // TODO change into a warning when type promotion be a thing
-        ret.callParameters.push_back(std::make_unique<ASTNode>(std::move(expr)));
+        if (precision != func.paramType[i]) {
+            TokenType promoted = tryPromote(precision, func.paramType[i]);
+            if (promoted == precision)
+                print_error("Argument type given is : "+precision+" but expected : "+func.paramType[i]);
+            else {
+                print_warning("Type "+precision+" was promoted to a "+promoted+" to fit the functions parameters");
+                ret.callParameters.push_back(std::make_unique<ASTNode>(std::move(PromotionNode{.topromote = promoted, .was = precision, .info = std::make_unique<ASTNode>(std::move(expr))})));
+            }
+        }
+        else 
+            ret.callParameters.push_back(std::make_unique<ASTNode>(std::move(expr)));
         if (i+1 != func.paramType.size())
             consume(TokenType::COMMA);
     }
@@ -83,9 +91,17 @@ ASTNode Parser::parse_identifier_sentence() {
         ASTNode expr = parse_expression(Precedence::LOWEST);
         TokenType precision = type_precision(expr);
         SymboleInfo a = GlobalSymboleTable.contains(name) ? GlobalSymboleTable.at(name) : currentFunc.LocalSymboleTable.at(name);
-        if (precision != a.type)
-            print_error("Error missmatched type for "+name+" of type "+a.type+" but given "+precision); // TODO : Will be changed to a warning when type promotion is a thing
-        ret.info = std::make_unique<ASTNode>(std::move(expr));
+        if (precision != a.type) {
+            TokenType promoted = tryPromote(precision, a.type);
+            if (promoted == precision)
+                print_error("Missmatched type for "+name+" of type "+a.type+" but given "+precision);
+            else {
+                print_warning("Type "+precision+" was promoted to a "+promoted+" to fit the variable value change");
+                ret.info = std::make_unique<ASTNode>(std::move(PromotionNode{.topromote = promoted, .was = precision, .info = std::make_unique<ASTNode>(std::move(expr))}));
+            }
+        }
+        else
+            ret.info = std::make_unique<ASTNode>(std::move(expr));
         consume(TokenType::SEMICOLON);
         return ret;
     }
@@ -132,7 +148,18 @@ ASTNode Parser::parse_local_variable_sentence() {
     if (peek().type == TokenType::EQUAL) {
         consume(TokenType::EQUAL);
         ASTNode info = parse_expression(Precedence::LOWEST);
-        ret.info = std::make_unique<ASTNode>(std::move(info));
+        TokenType precision = type_precision(info);
+        if (ret.type != precision) {
+            TokenType promoted = tryPromote(precision, ret.type);
+            if (promoted == precision)
+                print_error("Can't asign a "+precision+" to a "+ret.type+" variable");
+            else {
+                print_warning("Promoted the type from a "+precision+" to a "+promoted+" to allow the variable initialisation");
+                ret.info = std::make_unique<ASTNode>(std::move(PromotionNode{.topromote = promoted, .was = precision, .info = std::make_unique<ASTNode>(std::move(info))}));
+            }
+        }
+        else
+            ret.info = std::make_unique<ASTNode>(std::move(info));
     }
     else 
         ret.info = nullptr;
@@ -148,10 +175,17 @@ ASTNode Parser::parse_return_sentence() {
     consume(TokenType::RETURN);
     ASTNode expr = parse_expression(Precedence::LOWEST);
     consume(TokenType::SEMICOLON);
+    TokenType retType = type_precision(expr);
 
-    if (type_precision(expr) != currentFunc.retType)
-        print_error("Return type mismatch Given : "+currentFunc.retType+" Expected : "+type_precision(expr)); // TODO will be changed to a warning later when type promotion will be taken in effect
-
+    if (retType != currentFunc.retType) {
+        TokenType promotedType = tryPromote(retType,currentFunc.retType);
+        if (promotedType == retType)
+            print_error("Return type mismatch Given : "+currentFunc.retType+" Expected : "+retType); // TODO will be changed to a warning later when type promotion will be taken in effect
+        else {   
+            print_warning("Type "+retType+" was promoted to a "+promotedType+" to fit the functions returntype"); //TODO will probably be removed or made into a possible warning like -Wpromote
+            expr = PromotionNode{.topromote = promotedType, .was = retType, .info = std::make_unique<ASTNode>(std::move(expr))};
+        }
+    }
     return ReturnStmtNode{std::make_unique<ASTNode>(std::move(expr))};
 }
 
@@ -278,6 +312,14 @@ ASTNode Parser::parse_global_variable(const std::string& name, TokenType type) {
 	}
 	consume(TokenType::EQUAL);
 	ASTNode info = parse_expression(Precedence::LOWEST);
+    TokenType precision = type_precision(info);
+    if (type != precision) {
+        TokenType promoted = tryPromote(precision, type);
+        if (promoted == precision)
+            print_error("Can't asign a "+precision+" to a "+type+" variable");
+        else
+            print_warning("Promoted the type from a "+precision+" to a "+promoted+" to allow the variable initialisation");
+    }
 	consume(TokenType::SEMICOLON);
 	return VariableDeclare{.type = type, .info = std::make_unique<ASTNode>(std::move(info))};
 }
@@ -360,4 +402,12 @@ TokenType Parser::resolve_type(TokenType left, TokenType right) {
     if (left == TokenType::INT64 || right == TokenType::INT64) return TokenType::INT64; 
     if (left == TokenType::UINT32 || right == TokenType::UINT32) return TokenType::UINT32; 
     return TokenType::INT32;
+}
+
+TokenType Parser::tryPromote(TokenType currentType, TokenType promoteTo) {
+    if (resolve_type(currentType, promoteTo) == promoteTo)
+        return promoteTo;
+    if (currentType == TokenType::UINT32 && promoteTo == TokenType::INT32) return promoteTo;
+    if (currentType == TokenType::UINT64 && promoteTo == TokenType::INT64) return promoteTo;
+    return currentType;
 }
