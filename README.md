@@ -1,4 +1,14 @@
 # NebulaCompiler
-A compiler for the nebula language a C/C++ inspired language made for low level dev and more so kernel dev <br>
-The compiler is called with nbu \<file\> <br>
-The file extentions is .ne <br>
+A C/C++ inspired language designed for kernel and low level development.
+
+## Usage
+nbu <file.ne>
+
+## Features
+- Strongly typed with kernel-specific types (vaddr, paddr)
+- Inline assembly via asm { } blocks
+- Direct memory read/write primitives
+- Type safety and promotion
+
+## Building
+cmake . && make
