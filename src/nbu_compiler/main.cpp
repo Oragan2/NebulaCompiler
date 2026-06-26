@@ -1,5 +1,7 @@
 #include "../nbu_frontend/parser/parser.h"
 #include "../nbu_frontend/lexer/lexer.h"
+#include "semantic.h"
+#include <cstdlib>
 #include <vector>
 #include <variant>
 #include <iostream>
@@ -117,7 +119,18 @@ int main(int argc, char **argv) {
 
   std::vector<ASTNode> nodes = parser.parse();
 
-  print_tree(nodes);
+  Semantic semantic(nodes);
+
+  auto [errors, warnings] = semantic.semanticAnalyses();
+
+  std::cout << "The analyses ended with " << errors << "errors and " << warnings << " warnings" << std::endl;
+
+  if (errors == 0)
+    print_tree(semantic.getNodes());
+  else {
+    std::cerr << "Fix errors before recompilling" << std::endl;
+    return EXIT_FAILURE;
+  }
 
   return EXIT_SUCCESS;
 }

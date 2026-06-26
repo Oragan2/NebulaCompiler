@@ -21,43 +21,72 @@ std::unordered_set<TokenType> compOp = {
     TokenType::DIFFERENT
 };
 
+Semantic::Semantic(std::vector<ASTNode>& nodes) : nodes{nodes} {}
+
+std::vector<ASTNode>& Semantic::getNodes() {
+    return nodes;
+}
+
 std::pair<int, int> Semantic::semanticAnalyses() {
     for (const ASTNode& node : nodes)
     std::visit(overloads {
-        [this](const VariableDeclare& n) {
+        [this](VariableDeclare& n) {
             GlobalSymboleTable.emplace(n.name, SymboleInfo{.type = n.type, .stack_offset = 0});
+            if (n.info != nullptr) {
+                codeSemanticAnalyses(*n.info);
+                TokenType retType = type_precision(*n.info);
+                if (retType != n.type) {
+                    TokenType promote = tryPromote(retType, n.type);
+                    if (promote == retType) {
+                        print_error("The variable is a "+n.type+" but tryed to declare it a "+promote);
+                    }
+                    n.info = std::make_unique<ASTNode>(PromotionNode{promote, retType, std::move(n.info)});
+                }
+            }
         },
         [this](const FuncStmtNode& n) {
             currentFunc = FunctionInfo{.name = n.name, .retType = n.retType};
-            for (const std::unique_ptr<ASTNode>& parameterNode : n.parameters)
+            for (const std::unique_ptr<ASTNode>& parameterNode : n.parameters) {
                 std::visit(overloads {
                     [this](const VariableDeclare& n) {currentFunc.paramType.emplace_back(n.type);},
-                    [this](const auto& n) {print_error("only variable declaration can be done in the function declaration");}
+                    [this](const auto& n) {print_error("only variable declaration can be done in the function declaration"); }
                 },*parameterNode);
+                std::cout << *parameterNode;
+            }
             functions.emplace(currentFunc.name, currentFunc);
+            codeSemanticAnalyses(*n.code);
         },
         [this](const auto& n) {
             print_error("only variables and function declare at file root"); // fall back incase the parser didn't already took care of it
         }
     }, node);
 
+    for (const std::string& funcName : unknownFunctionName) {
+        if (!functions.contains(funcName))
+            print_error("Funcion "+funcName+" doesn't exist");
+    }
+
     return {errorNumber, warningNumber};
 }
 
-void Semantic::codeSemanticAnalyses(const ASTNode& node) {
+void Semantic::codeSemanticAnalyses(ASTNode& node) {
     std::visit(overloads {
-        [this](const Int32LiteralNode& n) {},
-        [this](const Float32LiteralNode& n) {},
-        [this](const ReturnStmtNode& n) {
+        [this](Int32LiteralNode& n) {},
+        [this](Float32LiteralNode& n) {},
+        [this](ReturnStmtNode& n) {
+            codeSemanticAnalyses(*n.expression);
             TokenType retVal = type_precision(*n.expression);
             if (retVal != currentFunc.retType) {
-                TokenType promoted = tryPromote(retVal, promoted);
+                TokenType promoted = tryPromote(retVal, currentFunc.retType);
                 if (promoted == retVal) {
                     print_error("function returned a different type from the announced value, returns : "+promoted+" instead of a "+currentFunc.retType);
                 }
+                n.expression = std::make_unique<ASTNode>(PromotionNode{promoted, retVal, std::move(n.expression)});
             }
         },
         [this](BinaryOpNode& n) {
+            codeSemanticAnalyses(*n.left);
+            codeSemanticAnalyses(*n.right);
             if (compOp.contains(n.op)) {
                 n.precision = TokenType::INT32;
                 TokenType left = type_precision(*n.left);
@@ -69,11 +98,128 @@ void Semantic::codeSemanticAnalyses(const ASTNode& node) {
                         if (promote != left) {
                             print_error("Can't compare a "+left+" to a "+right);
                         }
+                        n.right = std::make_unique<ASTNode>(PromotionNode{right,promote,std::move(n.right)});
                     }
+                    n.left = std::make_unique<ASTNode>(PromotionNode{promote,left,std::move(n.left)});
                 }
             }
-            else
+            else {
                 n.precision = resolve_type(type_precision(*n.left), type_precision(*n.right)); // didn't find another way
+            }
+        },
+        [this](VariableDeclare& n) {
+            if (currentFunc.LocalSymboleTable.contains(n.name) || GlobalSymboleTable.contains(n.name)) {
+                print_error("Variable "+n.name+" was already declared somewhere else");
+            }
+            currentFunc.LocalSymboleTable.emplace(n.name, SymboleInfo{n.name,n.type,0});
+            if (n.info != nullptr) {
+                codeSemanticAnalyses(*n.info);
+                TokenType retType = type_precision(*n.info);
+                if (retType != n.type) {
+                    TokenType promote = tryPromote(retType, n.type);
+                    if (promote == retType) {
+                        print_error("The variable is a "+n.type+" but tryed to declare it a "+promote);
+                    }
+                    n.info = std::make_unique<ASTNode>(PromotionNode{promote, retType, std::move(n.info)});
+                }
+            }
+        },
+        [this](VariableAccess& n) {
+            if (!currentFunc.LocalSymboleTable.contains(n.name) && !GlobalSymboleTable.contains(n.name))
+                print_error("Variable "+n.name+" unknown");
+        },
+        [this](UnaryOpNode& n) {
+            codeSemanticAnalyses(*n.operand);
+            if (n.op == TokenType::EXCLAMATION) {
+                TokenType typePrecision = type_precision(*n.operand);
+                if (type_precision(*n.operand) != TokenType::INT32) {
+                    TokenType promote = tryPromote(typePrecision, TokenType::INT32);
+                    if (promote == typePrecision)
+                        print_error("Can't use a ! other then for boolean expression");
+                    n.operand = std::make_unique<ASTNode>(PromotionNode{promote, typePrecision, std::move(n.operand)});
+                }
+                n.precision = TokenType::INT32;
+            }
+            else
+                n.precision = type_precision(*n.operand);
+        },
+        [this](IfStmtNode& n) {
+            codeSemanticAnalyses(*n.condition);
+            TokenType condType = type_precision(*n.condition);
+            if (condType != TokenType::INT32) {
+                TokenType promote = tryPromote(condType, TokenType::INT32);
+                if (promote == condType) {
+                    print_error("The value of the condition must be a boolean not a "+condType);
+                }
+                n.condition = std::make_unique<ASTNode>(PromotionNode{promote, condType, std::move(n.condition)});
+            }
+            codeSemanticAnalyses(*n.ifNode);
+            if (n.elseNode != nullptr)
+                codeSemanticAnalyses(*n.elseNode);
+        },
+        [this](BlockStmtNode& n) {
+            for (std::unique_ptr<ASTNode>& blockNode : n.codes) {
+                codeSemanticAnalyses(*blockNode);
+            }
+        },
+        [this](FuncCallStmtNode& n) {
+            if (!functions.contains(n.name)) {
+                unknownFunctionName.push_back(n.name);
+            }
+            FunctionInfo func = functions[n.name];
+            if (n.callParameters.size() != func.paramType.size()) {
+                print_error("The function "+func.name+" only take "+std::to_string(func.paramType.size())+" arguments but "+std::to_string(n.callParameters.size())+" where given");
+            }
+            for (unsigned int i = 0; i < func.paramType.size() && i < n.callParameters.size(); ++i) {
+                const std::unique_ptr<ASTNode>& param = n.callParameters[i];
+                const TokenType& type = func.paramType[i];
+                TokenType paramType = type_precision(*param);
+                if (type != paramType) {
+                    TokenType promote = tryPromote(paramType, type);
+                    if (promote == paramType) {
+                        print_error("Expected argument type "+type+" but received a "+promote+" for parameter "+std::to_string(i));
+                    }
+                    n.callParameters[i] = std::make_unique<ASTNode>(PromotionNode{promote, paramType, std::move(n.callParameters[i])});
+                } 
+            }
+        },
+        [this](VariableModNode& n) {
+            if (!(currentFunc.LocalSymboleTable.contains(n.name) && GlobalSymboleTable.contains(n.name))) 
+                print_error("The variable "+n.name+" doesn't exist");
+            codeSemanticAnalyses(*n.info);
+            TokenType retType = type_precision(*n.info);
+            SymboleInfo var = currentFunc.LocalSymboleTable.contains(n.name) ? currentFunc.LocalSymboleTable[n.name] : GlobalSymboleTable[n.name];
+            if (retType != var.type) {
+                TokenType promote = tryPromote(retType, var.type);
+                if (promote == retType) {
+                    print_error("The variable is a "+var.type+" but tryed to asigne a "+promote+" to it");
+                }
+                n.info = std::make_unique<ASTNode>(PromotionNode{promote, retType, std::move(n.info)});
+            }
+        },
+        [this](readAddrNode& n) {
+            codeSemanticAnalyses(*n.addr);
+            TokenType addrType = type_precision(*n.addr);
+            if (addrType != TokenType::VADDR && addrType != TokenType::PADDR) {
+                print_error("The read function can only take an addresse and not a "+addrType);
+            }
+        },
+        [this](writeAddrNode& n) {
+            codeSemanticAnalyses(*n.addr);
+            codeSemanticAnalyses(*n.value);
+            TokenType addrType = type_precision(*n.addr);
+            if (addrType != TokenType::VADDR && addrType != TokenType::PADDR) {
+                print_error("The read function can only take an addresse and not a "+addrType);
+            }
+        },
+        [this](asmNode& n) {
+            //do nothing
+        },
+        [this](PromotionNode& n) {
+            codeSemanticAnalyses(*n.info);
+        },
+        [this](FuncStmtNode& n) {
+            print_error("Function declaration impossible inside another function");
         }
     }, node);
 }

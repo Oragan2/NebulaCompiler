@@ -2,6 +2,7 @@
 #define PARSER_H
 
 #include "../lexer/lexer.h"
+#include <ostream>
 #include <vector>
 #include <variant>
 #include <memory>
@@ -26,6 +27,8 @@ using ASTNode = std::variant<
     struct writeAddrNode,
     struct asmNode
 >;
+
+std::ostream& operator<<(std::ostream& os, const ASTNode&);
 
 struct Int32LiteralNode {
     int32_t value;
@@ -75,13 +78,13 @@ struct BlockStmtNode {
 struct FuncStmtNode {
     std::string name;
     TokenType retType;
-    std::list<std::unique_ptr<ASTNode>> parameters;
+    std::vector<std::unique_ptr<ASTNode>> parameters;
     std::unique_ptr<ASTNode> code;
 };
 
 struct FuncCallStmtNode {
     std::string name;
-    std::list<std::unique_ptr<ASTNode>> callParameters;
+    std::vector<std::unique_ptr<ASTNode>> callParameters;
 };
 
 struct VariableModNode {

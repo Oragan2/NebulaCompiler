@@ -22,11 +22,12 @@ struct FunctionInfo {
 
 class Semantic {
     public:
-    Semantic(const std::vector<ASTNode>& nodes);
+    Semantic(std::vector<ASTNode>& nodes);
     std::pair<int, int> semanticAnalyses();
+    std::vector<ASTNode>& getNodes();
 
     private:
-    const std::vector<ASTNode>& nodes;
+    std::vector<ASTNode>& nodes;
     std::unordered_map<std::string, FunctionInfo> functions;
     std::unordered_map<std::string, SymboleInfo> GlobalSymboleTable;
     std::vector<std::string> unknownFunctionName; //For allowing to call functions declared after it just a final quick check
@@ -34,7 +35,7 @@ class Semantic {
     unsigned int errorNumber = 0;
     unsigned int warningNumber = 0;
 
-    void codeSemanticAnalyses(const ASTNode& node);
+    void codeSemanticAnalyses(ASTNode& node);
     TokenType type_precision(const ASTNode& node);
     TokenType resolve_type(TokenType left, TokenType right);
     TokenType tryPromote(TokenType currentType, TokenType promoteTo);

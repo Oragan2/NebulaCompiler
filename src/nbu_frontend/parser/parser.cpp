@@ -2,9 +2,13 @@
 #include "../lexer/lexer.h"
 #include <cstdlib>
 #include <unordered_set>
+#include <variant>
 #include <vector>
 #include <iostream>
 #include <string>
+
+template<class... Ts> struct overloads : Ts... { using Ts::operator()...; };
+template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 
 Parser::Parser(const std::vector<Token>& tokens) : tokens{tokens}, cursor{0} {}
 
@@ -29,6 +33,29 @@ std::unordered_set<std::string> readWriteNameTable {
     "write16",
     "write8"
 };
+
+//debug function
+std::ostream& operator<<(std::ostream& os, const ASTNode& node) {
+    std::visit(overloads {
+        [&](const Int32LiteralNode& n) {os << "Int32";},
+        [&](const Float32LiteralNode& n) {os << "float32";},
+        [&](const ReturnStmtNode& n) {os << "return";},
+        [&](const BinaryOpNode& n) {os << "binaryOp";},
+        [&](const VariableDeclare& n) {os << "varDecl";},
+        [&](const VariableAccess& n) {os << "varAcc";},
+        [&](const UnaryOpNode& n) {os << "unaryOp";},
+        [&](const IfStmtNode& n) {os << "if";},
+        [&](const BlockStmtNode& n) {os << "block";},
+        [&](const FuncStmtNode& n) {os << "funcDec";},
+        [&](const FuncCallStmtNode& n) {os << "funcCall";},
+        [&](const VariableModNode& n) {os << "varMod";},
+        [&](const PromotionNode& n) {os << "Promot";},
+        [&](const readAddrNode& n) {os << "read";},
+        [&](const writeAddrNode& n) {os << "write";},
+        [&](const asmNode& n) {os << "asm";}
+    },node);
+    return os;
+}
 
 inline const Token& Parser::peek() { return tokens[cursor]; }
 
