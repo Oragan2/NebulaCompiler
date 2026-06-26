@@ -7,7 +7,6 @@
 #include <memory>
 #include <string>
 #include <list>
-#include <map>
 
 using ASTNode = std::variant<
     struct Int32LiteralNode,
@@ -111,17 +110,6 @@ struct asmNode {
     std::string rawAsm;
 };
 
-struct SymboleInfo {
-    TokenType type;
-    unsigned int stack_offset;
-};
-
-struct FunctionInfo {
-    TokenType retType;
-    std::map<std::string, SymboleInfo> LocalSymboleTable;
-    std::vector<TokenType> paramType;
-};
-
 enum Precedence {
     LOWEST,
     LOGICAL_OR,
@@ -145,11 +133,8 @@ class Parser {
     
     private:
     Parser();
-    std::vector<Token> tokens;
+    const std::vector<Token>& tokens;
     unsigned int cursor;
-    std::map<std::string, FunctionInfo> functions;
-    std::map<std::string, SymboleInfo> GlobalSymboleTable;
-    FunctionInfo currentFunc;
 
     inline const Token& peek();
     Token consume(TokenType expected);
@@ -168,9 +153,6 @@ class Parser {
     ASTNode parse_expression(int precedence);
     ASTNode parse_primary();
     ASTNode parse_asm();
-    TokenType type_precision(const ASTNode& node);
-    TokenType resolve_type(TokenType left, TokenType right);
-    TokenType tryPromote(TokenType currentType, TokenType promoteTo);
 };
 
 #endif

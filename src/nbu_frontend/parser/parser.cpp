@@ -1,15 +1,10 @@
 #include "parser.h"
 #include "../lexer/lexer.h"
-#include <cstddef>
 #include <cstdlib>
 #include <unordered_set>
 #include <vector>
 #include <iostream>
-#include <map>
 #include <string>
-
-template<class... Ts> struct overloads : Ts... { using Ts::operator()...; };
-template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 
 Parser::Parser(const std::vector<Token>& tokens) : tokens{tokens}, cursor{0} {}
 
@@ -71,23 +66,11 @@ ASTNode Parser::parse_asm() {
 }
 
 ASTNode Parser::parse_function_call(const std::string& name) {
-    const FunctionInfo& func = functions[name];
     FuncCallStmtNode ret;
-    for (int i = 0; i < func.paramType.size(); ++i) {
+    while (peek().type != TokenType::RPARAM) {
         ASTNode expr = parse_expression(Precedence::LOWEST);
-        TokenType precision = type_precision(expr);
-        if (precision != func.paramType[i]) {
-            TokenType promoted = tryPromote(precision, func.paramType[i]);
-            if (promoted == precision)
-                print_error("Argument type given is : "+precision+" but expected : "+func.paramType[i]);
-            else {
-                print_warning("Type "+precision+" was promoted to a "+promoted+" to fit the functions parameters");
-                ret.callParameters.push_back(std::make_unique<ASTNode>(std::move(PromotionNode{.topromote = promoted, .was = precision, .info = std::make_unique<ASTNode>(std::move(expr))})));
-            }
-        }
-        else 
-            ret.callParameters.push_back(std::make_unique<ASTNode>(std::move(expr)));
-        if (i+1 != func.paramType.size())
+        ret.callParameters.push_back(std::make_unique<ASTNode>(std::move(expr)));
+        if (peek().type != TokenType::RPARAM)
             consume(TokenType::COMMA);
     }
     ret.name = name;
@@ -97,45 +80,11 @@ ASTNode Parser::parse_function_call(const std::string& name) {
 
 ASTNode Parser::parse_identifier_sentence() {
     std::string name = peek().val;
-    if (!(GlobalSymboleTable.contains(name) || currentFunc.LocalSymboleTable.contains(name) || functions.contains(name) || readWriteNameTable.contains(name))) {
-        print_error("symbole "+peek().val+" unknown");
-    } 
     consume(TokenType::IDENTIFIER);
-    if (functions.contains(name)) {
-        consume(TokenType::LPARAM);
-        ASTNode ret = parse_function_call(name);
-        consume(TokenType::SEMICOLON);
-        return ret;
-    }
-    if (peek().type == TokenType::EQUAL) {
-        consume(TokenType::EQUAL);
-        VariableModNode ret;
-        ret.name = name;
-        ASTNode expr = parse_expression(Precedence::LOWEST);
-        TokenType precision = type_precision(expr);
-        SymboleInfo a = GlobalSymboleTable.contains(name) ? GlobalSymboleTable.at(name) : currentFunc.LocalSymboleTable.at(name);
-        if (precision != a.type) {
-            TokenType promoted = tryPromote(precision, a.type);
-            if (promoted == precision)
-                print_error("Missmatched type for "+name+" of type "+a.type+" but given "+precision);
-            else {
-                print_warning("Type "+precision+" was promoted to a "+promoted+" to fit the variable value change");
-                ret.info = std::make_unique<ASTNode>(std::move(PromotionNode{.topromote = promoted, .was = precision, .info = std::make_unique<ASTNode>(std::move(expr))}));
-            }
-        }
-        else
-            ret.info = std::make_unique<ASTNode>(std::move(expr));
-        consume(TokenType::SEMICOLON);
-        return ret;
-    }
     if (readWriteNameTable.contains(name)) {
         consume(TokenType::LPARAM);
         ASTNode addr = parse_expression(Precedence::LOWEST);
-        TokenType addrType = type_precision(addr);
-        if (addrType != TokenType::VADDR && addrType != TokenType::PADDR) {
-            print_error("Was not provided with an address type");
-        }
-        if (name.find("read") < name.size()) {
+        if (name.find("read") != std::string::npos) {
             readAddrNode ret;
             ret.quantity = std::stoi(name.data()+4);
             ret.addr = std::make_unique<ASTNode>(std::move(addr));
@@ -154,6 +103,23 @@ ASTNode Parser::parse_identifier_sentence() {
             return ret;
         }
     }
+    if (TokenType::LPARAM == peek().type) {
+        consume(TokenType::LPARAM);
+        ASTNode ret = parse_function_call(name);
+        consume(TokenType::SEMICOLON);
+        return ret;
+    }
+    if (peek().type == TokenType::EQUAL) {
+        consume(TokenType::EQUAL);
+        VariableModNode ret;
+        ret.name = name;
+        ASTNode expr = parse_expression(Precedence::LOWEST);
+        ret.info = std::make_unique<ASTNode>(std::move(expr));
+        consume(TokenType::SEMICOLON);
+        return ret;
+    }
+    else 
+        print_error("Unknown identifer: " + name);
 }
 
 ASTNode Parser::parse_if_sentence() {
@@ -197,25 +163,12 @@ ASTNode Parser::parse_local_variable_sentence() {
     if (peek().type == TokenType::EQUAL) {
         consume(TokenType::EQUAL);
         ASTNode info = parse_expression(Precedence::LOWEST);
-        TokenType precision = type_precision(info);
-        if (ret.type != precision) {
-            TokenType promoted = tryPromote(precision, ret.type);
-            if (promoted == precision)
-                print_error("Can't asign a "+precision+" to a "+ret.type+" variable");
-            else {
-                print_warning("Promoted the type from a "+precision+" to a "+promoted+" to allow the variable initialisation");
-                ret.info = std::make_unique<ASTNode>(std::move(PromotionNode{.topromote = promoted, .was = precision, .info = std::make_unique<ASTNode>(std::move(info))}));
-            }
-        }
-        else
-            ret.info = std::make_unique<ASTNode>(std::move(info));
+        ret.info = std::make_unique<ASTNode>(std::move(info));
     }
     else 
         ret.info = nullptr;
 
     consume(TokenType::SEMICOLON);
-
-    currentFunc.LocalSymboleTable.emplace(name, SymboleInfo{.type = ret.type, .stack_offset = 0});
 
     return ret;
 }
@@ -224,59 +177,42 @@ ASTNode Parser::parse_return_sentence() {
     consume(TokenType::RETURN);
     ASTNode expr = parse_expression(Precedence::LOWEST);
     consume(TokenType::SEMICOLON);
-    TokenType retType = type_precision(expr);
-
-    if (retType != currentFunc.retType) {
-        TokenType promotedType = tryPromote(retType,currentFunc.retType);
-        if (promotedType == retType)
-            print_error("Return type mismatch Given : "+currentFunc.retType+" Expected : "+retType); // TODO will be changed to a warning later when type promotion will be taken in effect
-        else {   
-            print_warning("Type "+retType+" was promoted to a "+promotedType+" to fit the functions returntype"); //TODO will probably be removed or made into a possible warning like -Wpromote
-            expr = PromotionNode{.topromote = promotedType, .was = retType, .info = std::make_unique<ASTNode>(std::move(expr))};
-        }
-    }
     return ReturnStmtNode{std::make_unique<ASTNode>(std::move(expr))};
 }
 
 ASTNode Parser::parse_primary() {
-    if (GlobalSymboleTable.contains(peek().val) || currentFunc.LocalSymboleTable.contains(peek().val)) {
-        return (VariableAccess){.name = consume(TokenType::IDENTIFIER).val};
-    }
-    else if (functions.contains(peek().val)) {
-        const std::string& name = peek().val;
-        consume(TokenType::IDENTIFIER);
-        consume(TokenType::LPARAM);
-        return parse_function_call(name);
-    }
-    else if (readWriteNameTable.contains(peek().val)) {
+    if (readWriteNameTable.contains(peek().val)) {
         std::string name = peek().val;
         consume(TokenType::IDENTIFIER);
         consume(TokenType::LPARAM);
         ASTNode addr = parse_expression(Precedence::LOWEST);
-        TokenType addrType = type_precision(addr);
-        if (addrType != TokenType::VADDR && addrType != TokenType::PADDR) {
-            print_error("Was not provided with an address type");
-        }
-        if (name.find("read") < name.size()) {
+        if (name.find("read") != std::string::npos) {
             readAddrNode ret;
             ret.quantity = std::stoi(name.data()+4);
             ret.addr = std::make_unique<ASTNode>(std::move(addr));
             consume(TokenType::RPARAM);
             return ret;
         }
-        else {
-            print_error("A write doesn't return anything");
-        }
+        else
+            print_error("Write can't be used as an expression");
     }
-    else if (peek().type == TokenType::IDENTIFIER) {
-        print_error("Symbole : "+peek().val+" unknown");
+    else if (TokenType::IDENTIFIER == peek().type) {
+        const std::string& name = peek().val;
+        consume(TokenType::IDENTIFIER);
+        if (TokenType::LPARAM == peek().type) {
+            consume(TokenType::LPARAM);
+            return parse_function_call(name);
+        }
+        else 
+            return VariableAccess{.name = name};
     }
     else {
         if (peek().type == TokenType::INT_SIGNED_32)
             return Int32LiteralNode{.value = std::stoi(consume(TokenType::INT_SIGNED_32).val)};
-        else
-            return Float32LiteralNode{.value = std::stof(consume(TokenType::FLOAT_SIGNED_32).val)}; 
+        if (peek().type == TokenType::FLOAT_SIGNED_32)
+            return Float32LiteralNode{.value = std::stof(consume(TokenType::FLOAT_SIGNED_32).val)};
     }
+    print_error("Unknown type: "+peek().type);
 }
 
 Precedence get_token_precedence(TokenType type) {
@@ -331,9 +267,7 @@ ASTNode Parser::parse_expression(int precedence) {
 
         ASTNode operand = parse_expression(Precedence::PREFIX);
 
-        TokenType precision = type_precision(operand);
-
-        left = UnaryOpNode{token.type, precision, std::make_unique<ASTNode>(std::move(operand))};
+        left = UnaryOpNode{token.type, TokenType::EOFTOKEN, std::make_unique<ASTNode>(std::move(operand))};
     } else {
         left = parse_primary();
     }
@@ -344,8 +278,7 @@ ASTNode Parser::parse_expression(int precedence) {
 
         ASTNode right = parse_expression(get_token_precedence(op.type));
 
-        TokenType precision = resolve_type(type_precision(left), type_precision(right));
-        left = BinaryOpNode{op.type,precision,std::make_unique<ASTNode>(std::move(left)),std::make_unique<ASTNode>(std::move(right))};
+        left = BinaryOpNode{.op = op.type,.precision=TokenType::EOFTOKEN,.left = std::make_unique<ASTNode>(std::move(left)),.right = std::make_unique<ASTNode>(std::move(right))};
     }
 
     return left;
@@ -374,21 +307,12 @@ std::vector<ASTNode> Parser::parse() {
 }
 
 ASTNode Parser::parse_global_variable(const std::string& name, TokenType type) {
-	GlobalSymboleTable.emplace(name, SymboleInfo{.type = type, .stack_offset = 0});
 	if (peek().type != TokenType::EQUAL) {
 		consume(TokenType::SEMICOLON);
 		return VariableDeclare{ .name = name, .type = type, .info = nullptr};
 	}
 	consume(TokenType::EQUAL);
 	ASTNode info = parse_expression(Precedence::LOWEST);
-    TokenType precision = type_precision(info);
-    if (type != precision) {
-        TokenType promoted = tryPromote(precision, type);
-        if (promoted == precision)
-            print_error("Can't asign a "+precision+" to a "+type+" variable");
-        else
-            print_warning("Promoted the type from a "+precision+" to a "+promoted+" to allow the variable initialisation");
-    }
 	consume(TokenType::SEMICOLON);
 	return VariableDeclare{.type = type, .info = std::make_unique<ASTNode>(std::move(info))};
 }
@@ -408,18 +332,15 @@ ASTNode Parser::parse_parameter() {
     }
     else
         ret.info = nullptr;
-    
-    currentFunc.LocalSymboleTable.emplace(name,SymboleInfo{.type = ret.type, .stack_offset = 0});
+
     return ret;
 }
 
 ASTNode Parser::parse_function(const std::string& name, TokenType retValue) {
     FuncStmtNode ret;
     ret.retType = retValue;
-    currentFunc = FunctionInfo{.retType = retValue};
     consume(TokenType::LPARAM);
     while (peek().type != TokenType::RPARAM) {
-        currentFunc.paramType.push_back(peek().type);
         ret.parameters.push_back(std::make_unique<ASTNode>(std::move(parse_parameter())));
         if (peek().type != TokenType::RPARAM)
             consume(TokenType::COMMA);
@@ -431,7 +352,6 @@ ASTNode Parser::parse_function(const std::string& name, TokenType retValue) {
         ret.code = nullptr;
     else 
         ret.code = std::make_unique<ASTNode>(std::move(parse_sentence()));
-    functions.emplace(name, currentFunc);
     return ret; 
 }
 
@@ -444,47 +364,4 @@ ASTNode Parser::parse_function(const std::string& name, TokenType retValue) {
 void Parser::print_warning(const std::string& msg) {
     std::cerr << "Warning : " << msg << std::endl;
     std::cerr << "Line : " << peek().line << " Column : " << peek().column << std::endl;
-}
-
-TokenType Parser::type_precision(const ASTNode& node) {
-    return std::visit(overloads {
-        [this](const Int32LiteralNode& n) {return TokenType::INT32;},
-        [this](const Float32LiteralNode& n) {return TokenType::FLOAT32;},
-        [this](const VariableAccess& n) {
-            if (currentFunc.LocalSymboleTable.contains(n.name))
-                return currentFunc.LocalSymboleTable.at(n.name).type;
-            else
-                return GlobalSymboleTable.at(n.name).type;
-        },
-        [this](const BinaryOpNode& n) {return resolve_type(type_precision(*n.left), type_precision(*n.right));},
-        [this](const UnaryOpNode& n) {return type_precision(*n.operand);},
-        [this](const FuncCallStmtNode& n) {return functions.at(n.name).retType;},
-        [this](const readAddrNode& n ) {
-            if (n.quantity == 64) return TokenType::UINT64;
-            if (n.quantity == 32) return TokenType::UINT32;
-            if (n.quantity == 16) return TokenType::UINT32; // will change
-            else return TokenType::UINT32; // will change
-        },
-        [this](const auto&) {print_error("Uh?"); return TokenType::EOFTOKEN;}
-    }, node);
-}
-
-TokenType Parser::resolve_type(TokenType left, TokenType right) {
-    if (left == right) return left;
-    if (left == TokenType::FLOAT64 || right == TokenType::FLOAT64) return TokenType::FLOAT64; 
-    if (left == TokenType::FLOAT32 || right == TokenType::FLOAT32) return TokenType::FLOAT32; 
-    if (left == TokenType::VADDR || right == TokenType::VADDR) return TokenType::VADDR;
-    if (left == TokenType::PADDR || right == TokenType::PADDR) return TokenType::PADDR;
-    if (left == TokenType::UINT64 || right == TokenType::UINT64) return TokenType::UINT64; 
-    if (left == TokenType::INT64 || right == TokenType::INT64) return TokenType::INT64; 
-    if (left == TokenType::UINT32 || right == TokenType::UINT32) return TokenType::UINT32; 
-    return TokenType::INT32;
-}
-
-TokenType Parser::tryPromote(TokenType currentType, TokenType promoteTo) {
-    if (resolve_type(currentType, promoteTo) == promoteTo)
-        return promoteTo;
-    if (currentType == TokenType::UINT32 && promoteTo == TokenType::INT32) return promoteTo;
-    if (currentType == TokenType::UINT64 && promoteTo == TokenType::INT64) return promoteTo;
-    return currentType;
 }
