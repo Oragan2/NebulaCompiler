@@ -74,6 +74,7 @@ struct BlockStmtNode {
 };
 
 struct FuncStmtNode {
+    std::string name;
     TokenType retType;
     std::list<std::unique_ptr<ASTNode>> parameters;
     std::unique_ptr<ASTNode> code;
