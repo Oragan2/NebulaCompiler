@@ -48,6 +48,7 @@ struct BinaryOpNode {
 };
 
 struct VariableDeclare {
+    std::string name;
     TokenType type;
     std::unique_ptr<ASTNode> info;
 };
@@ -151,7 +152,7 @@ class Parser {
 
     inline const Token& peek();
     Token consume(TokenType expected);
-    void print_error(const std::string& msg);
+    [[noreturn]] void print_error(const std::string& msg);
     void print_warning(const std::string& msg);
     ASTNode parse_sentence();
     ASTNode parse_identifier_sentence();

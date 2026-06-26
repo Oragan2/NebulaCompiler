@@ -377,7 +377,7 @@ ASTNode Parser::parse_global_variable(const std::string& name, TokenType type) {
 	GlobalSymboleTable.emplace(name, SymboleInfo{.type = type, .stack_offset = 0});
 	if (peek().type != TokenType::EQUAL) {
 		consume(TokenType::SEMICOLON);
-		return VariableDeclare{.type = type, .info = nullptr};
+		return VariableDeclare{ .name = name, .type = type, .info = nullptr};
 	}
 	consume(TokenType::EQUAL);
 	ASTNode info = parse_expression(Precedence::LOWEST);
@@ -435,7 +435,7 @@ ASTNode Parser::parse_function(const std::string& name, TokenType retValue) {
     return ret; 
 }
 
-void Parser::print_error(const std::string& msg) {
+[[noreturn]] void Parser::print_error(const std::string& msg) {
     std::cerr << "Error : " << msg << std::endl;
     std::cerr << "Line : " << peek().line << " Column : " << peek().column << std::endl;
     std::exit(1);
@@ -461,7 +461,9 @@ TokenType Parser::type_precision(const ASTNode& node) {
         [this](const FuncCallStmtNode& n) {return functions.at(n.name).retType;},
         [this](const readAddrNode& n ) {
             if (n.quantity == 64) return TokenType::UINT64;
-            if (n.quantity == 32) return TokenType::UINT32; // Will do the other when the time come
+            if (n.quantity == 32) return TokenType::UINT32;
+            if (n.quantity == 16) return TokenType::UINT32; // will change
+            else return TokenType::UINT32; // will change
         },
         [this](const auto&) {print_error("Uh?"); return TokenType::EOFTOKEN;}
     }, node);
