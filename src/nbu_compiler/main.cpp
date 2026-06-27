@@ -17,7 +17,7 @@ void print_node(const ASTNode& node) {
             [](const BinaryOpNode& n) {
                 std::cout << "BinaryOp(";
                 print_node(*n.left);
-                std::cout << n.op << " ";
+                std::cout << " " <<  n.op << " ";
                 print_node(*n.right);
                 std::cout << ") ";
             },
@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
 
   auto [errors, warnings] = semantic.semanticAnalyses();
 
-  std::cout << "The analyses ended with " << errors << "errors and " << warnings << " warnings" << std::endl;
+  std::cout << "The analyses ended with " << errors << " errors and " << warnings << " warnings" << std::endl;
 
   if (errors == 0)
     print_tree(semantic.getNodes());

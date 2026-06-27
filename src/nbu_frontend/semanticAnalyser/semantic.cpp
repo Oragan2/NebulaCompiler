@@ -28,38 +28,55 @@ std::vector<ASTNode>& Semantic::getNodes() {
 }
 
 std::pair<int, int> Semantic::semanticAnalyses() {
-    for (const ASTNode& node : nodes)
-    std::visit(overloads {
-        [this](VariableDeclare& n) {
-            GlobalSymboleTable.emplace(n.name, SymboleInfo{.type = n.type, .stack_offset = 0});
-            if (n.info != nullptr) {
-                codeSemanticAnalyses(*n.info);
-                TokenType retType = type_precision(*n.info);
-                if (retType != n.type) {
-                    TokenType promote = tryPromote(retType, n.type);
-                    if (promote == retType) {
-                        print_error("The variable is a "+n.type+" but tryed to declare it a "+promote);
+    for (ASTNode& node : nodes) {
+        std::visit(overloads {
+            [this](VariableDeclare& n) {
+                GlobalSymboleTable.emplace(n.name, SymboleInfo{.type = n.type, .stack_offset = 0});
+                if (n.info != nullptr) {
+                    codeSemanticAnalyses(*n.info);
+                    TokenType retType = type_precision(*n.info);
+                    if (retType != n.type) {
+                        TokenType promote = tryPromote(retType, n.type);
+                        if (promote == retType) {
+                            print_error("The variable is a "+n.type+" but tryed to declare it a "+promote);
+                        }
+                        n.info = std::make_unique<ASTNode>(PromotionNode{promote, retType, std::move(n.info)});
                     }
-                    n.info = std::make_unique<ASTNode>(PromotionNode{promote, retType, std::move(n.info)});
                 }
+            },
+            [this](FuncStmtNode& n) {
+                currentFunc = FunctionInfo{.name = n.name, .retType = n.retType};
+                scopeStack.push_back({});
+                for (std::unique_ptr<ASTNode>& parameterNode : n.parameters) {
+                    std::visit(overloads {
+                        [this](VariableDeclare& n) {
+                            currentFunc.paramType.emplace_back(n.type);
+                            scopeStack.back().emplace(n.name, SymboleInfo{n.name, n.type, 0});
+                            if (n.info != nullptr) {
+                                codeSemanticAnalyses(*n.info);
+                                TokenType retType = type_precision(*n.info);
+                                if (retType != n.type) {
+                                    TokenType promote = tryPromote(retType, n.type);
+                                    if (promote == retType) {
+                                        print_error("The variable is a "+n.type+" but tryed to declare it a "+promote);
+                                    }
+                                    n.info = std::make_unique<ASTNode>(PromotionNode{promote, retType, std::move(n.info)});
+                                }
+                            }
+                        },
+                        [this](auto& n) {print_error("only variable declaration can be done in the function declaration"); }
+                    },*parameterNode);
+                }
+                functions.emplace(currentFunc.name, currentFunc);
+                codeSemanticAnalyses(*n.code);
+                scopeStack.pop_back();
+            },
+            [this](const auto& n) {
+                print_error("only variables and function declare at file root"); // fall back incase the parser didn't already took care of it
             }
-        },
-        [this](const FuncStmtNode& n) {
-            currentFunc = FunctionInfo{.name = n.name, .retType = n.retType};
-            for (const std::unique_ptr<ASTNode>& parameterNode : n.parameters) {
-                std::visit(overloads {
-                    [this](const VariableDeclare& n) {currentFunc.paramType.emplace_back(n.type);},
-                    [this](const auto& n) {print_error("only variable declaration can be done in the function declaration"); }
-                },*parameterNode);
-                std::cout << *parameterNode;
-            }
-            functions.emplace(currentFunc.name, currentFunc);
-            codeSemanticAnalyses(*n.code);
-        },
-        [this](const auto& n) {
-            print_error("only variables and function declare at file root"); // fall back incase the parser didn't already took care of it
-        }
-    }, node);
+        }, node);
+    }
+        
 
     for (const std::string& funcName : unknownFunctionName) {
         if (!functions.contains(funcName))
@@ -108,10 +125,10 @@ void Semantic::codeSemanticAnalyses(ASTNode& node) {
             }
         },
         [this](VariableDeclare& n) {
-            if (currentFunc.LocalSymboleTable.contains(n.name) || GlobalSymboleTable.contains(n.name)) {
+            if (scopeStack.back().contains(n.name)) {
                 print_error("Variable "+n.name+" was already declared somewhere else");
             }
-            currentFunc.LocalSymboleTable.emplace(n.name, SymboleInfo{n.name,n.type,0});
+            scopeStack.back().emplace(n.name, SymboleInfo{n.name, n.type, 0});
             if (n.info != nullptr) {
                 codeSemanticAnalyses(*n.info);
                 TokenType retType = type_precision(*n.info);
@@ -125,8 +142,14 @@ void Semantic::codeSemanticAnalyses(ASTNode& node) {
             }
         },
         [this](VariableAccess& n) {
-            if (!currentFunc.LocalSymboleTable.contains(n.name) && !GlobalSymboleTable.contains(n.name))
-                print_error("Variable "+n.name+" unknown");
+            char found = 0;
+            for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
+                if (it->contains(n.name))
+                    found = 1;
+            }
+            if (!found) {
+                print_error("Variable "+n.name+" not declared inside this scope");
+            }
         },
         [this](UnaryOpNode& n) {
             codeSemanticAnalyses(*n.operand);
@@ -158,9 +181,11 @@ void Semantic::codeSemanticAnalyses(ASTNode& node) {
                 codeSemanticAnalyses(*n.elseNode);
         },
         [this](BlockStmtNode& n) {
+            scopeStack.push_back({});
             for (std::unique_ptr<ASTNode>& blockNode : n.codes) {
                 codeSemanticAnalyses(*blockNode);
             }
+            scopeStack.pop_back();
         },
         [this](FuncCallStmtNode& n) {
             if (!functions.contains(n.name)) {
@@ -184,11 +209,11 @@ void Semantic::codeSemanticAnalyses(ASTNode& node) {
             }
         },
         [this](VariableModNode& n) {
-            if (!(currentFunc.LocalSymboleTable.contains(n.name) && GlobalSymboleTable.contains(n.name))) 
+            if (!(scopeStack.back().contains(n.name) || GlobalSymboleTable.contains(n.name))) 
                 print_error("The variable "+n.name+" doesn't exist");
             codeSemanticAnalyses(*n.info);
             TokenType retType = type_precision(*n.info);
-            SymboleInfo var = currentFunc.LocalSymboleTable.contains(n.name) ? currentFunc.LocalSymboleTable[n.name] : GlobalSymboleTable[n.name];
+            SymboleInfo var = scopeStack.back().contains(n.name) ? scopeStack.back()[n.name] : GlobalSymboleTable[n.name];
             if (retType != var.type) {
                 TokenType promote = tryPromote(retType, var.type);
                 if (promote == retType) {
@@ -229,10 +254,13 @@ TokenType Semantic::type_precision(const ASTNode& node) {
         [this](const Int32LiteralNode& n) {return TokenType::INT32;},
         [this](const Float32LiteralNode& n) {return TokenType::FLOAT32;},
         [this](const VariableAccess& n) {
-            if (currentFunc.LocalSymboleTable.contains(n.name))
-                return currentFunc.LocalSymboleTable.at(n.name).type;
-            else
+            for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
+                if (it->contains(n.name))
+                    return (*it)[n.name].type;
+            }
+            if (GlobalSymboleTable.contains(n.name))
                 return GlobalSymboleTable.at(n.name).type;
+            return TokenType::EOFTOKEN;
         },
         [this](const BinaryOpNode& n) {return resolve_type(type_precision(*n.left), type_precision(*n.right));},
         [this](const UnaryOpNode& n) {return type_precision(*n.operand);},

@@ -16,7 +16,6 @@ struct SymboleInfo {
 struct FunctionInfo {
     std::string name;
     TokenType retType;
-    std::unordered_map<std::string, SymboleInfo> LocalSymboleTable;
     std::vector<TokenType> paramType;
 };
 
@@ -31,6 +30,7 @@ class Semantic {
     std::unordered_map<std::string, FunctionInfo> functions;
     std::unordered_map<std::string, SymboleInfo> GlobalSymboleTable;
     std::vector<std::string> unknownFunctionName; //For allowing to call functions declared after it just a final quick check
+    std::vector<std::unordered_map<std::string, SymboleInfo>> scopeStack;
     FunctionInfo currentFunc;
     unsigned int errorNumber = 0;
     unsigned int warningNumber = 0;

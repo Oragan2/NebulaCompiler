@@ -186,6 +186,7 @@ ASTNode Parser::parse_local_variable_sentence() {
     VariableDeclare ret = (VariableDeclare){.type = peek().type};
     consume(peek().type);
     std::string name = peek().val; 
+    ret.name = name;
     consume(TokenType::IDENTIFIER);
     if (peek().type == TokenType::EQUAL) {
         consume(TokenType::EQUAL);
@@ -352,6 +353,7 @@ ASTNode Parser::parse_parameter() {
     ret.type = peek().type;
     consume(peek().type);
     std::string name = peek().val;
+    ret.name = name;
     consume(TokenType::IDENTIFIER);
     if (peek().type == TokenType::EQUAL) {
         consume(TokenType::EQUAL);
@@ -366,6 +368,7 @@ ASTNode Parser::parse_parameter() {
 ASTNode Parser::parse_function(const std::string& name, TokenType retValue) {
     FuncStmtNode ret;
     ret.retType = retValue;
+    ret.name = name;
     consume(TokenType::LPARAM);
     while (peek().type != TokenType::RPARAM) {
         ret.parameters.push_back(std::make_unique<ASTNode>(std::move(parse_parameter())));
