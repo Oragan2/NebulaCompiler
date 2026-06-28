@@ -8,7 +8,6 @@
 #include <variant>
 #include <memory>
 #include <string>
-#include <list>
 
 namespace nbuFrontend {
     using ASTNode = std::variant<
@@ -39,8 +38,8 @@ namespace nbuFrontend {
         };
         Kind kind;
         std::string name;
-        bool operator!=(const Type& other);
-        bool operator==(const Type& other);
+        bool operator!=(const Type& other) const;
+        bool operator==(const Type& other) const;
     };
 
     std::ostream& operator<<(std::ostream& os, Type token); 
@@ -91,7 +90,7 @@ namespace nbuFrontend {
     };
 
     struct BlockStmtNode {
-        std::list<std::unique_ptr<ASTNode>> codes;
+        std::vector<std::unique_ptr<ASTNode>> codes;
     };
 
     struct FuncStmtNode {
@@ -168,10 +167,10 @@ namespace nbuFrontend {
         ASTNode parse_function_call(const std::string& name);
         ASTNode parse_return_sentence();
         ASTNode parse_local_variable_sentence();
-        ASTNode parse_global_variable(const std::string& name, std::string type);
+        ASTNode parse_global_variable(const std::string& name, Type type);
         ASTNode parse_if_sentence();
         ASTNode parse_block();
-        ASTNode parse_function(const std::string& name, std::string retValue);
+        ASTNode parse_function(const std::string& name, Type retValue);
         ASTNode parse_parameter();
         ASTNode parse_expression(int precedence);
         ASTNode parse_primary();

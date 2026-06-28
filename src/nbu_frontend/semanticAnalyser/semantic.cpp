@@ -30,6 +30,7 @@ namespace nbuFrontend {
 
     std::pair<int, int> Semantic::semanticAnalyses() {
         for (ASTNode& node : nodes) {
+            std::cout << node << std::endl;
             std::visit(overloads {
                 [this](VariableDeclare& n) {
                     GlobalSymboleTable.emplace(n.name, SymboleInfo{.type = n.type, .stack_offset = 0});
@@ -48,9 +49,11 @@ namespace nbuFrontend {
                 [this](FuncStmtNode& n) {
                     currentFunc = FunctionInfo{.name = n.name, .retType = n.retType};
                     scopeStack.push_back({});
+                    std::cerr << "After push, stack size: " << scopeStack.size() << std::endl;
                     for (std::unique_ptr<ASTNode>& parameterNode : n.parameters) {
                         std::visit(overloads {
                             [this](VariableDeclare& n) {
+                                std::cout << n.name << std::endl;
                                 currentFunc.paramType.emplace_back(n.type);
                                 scopeStack.back().emplace(n.name, SymboleInfo{n.name, n.type, 0});
                                 if (n.info != nullptr) {
@@ -68,8 +71,15 @@ namespace nbuFrontend {
                             [this](auto& n) {print_error("only variable declaration can be done in the function declaration"); }
                         },*parameterNode);
                     }
+
+                    std::cerr << "Before body, stack size: " << scopeStack.size() << std::endl;
+                        for (auto& scope : scopeStack)
+                            for (auto& [name, info] : scope)
+                                std::cerr << "  var: " << name << std::endl;
+
                     functions.emplace(currentFunc.name, currentFunc);
-                    codeSemanticAnalyses(*n.code);
+                    if (n.code != nullptr)
+                        codeSemanticAnalyses(*n.code);
                     scopeStack.pop_back();
                 },
                 [this](const auto& n) {
@@ -77,17 +87,12 @@ namespace nbuFrontend {
                 }
             }, node);
         }
-            
-
-        for (const std::string& funcName : unknownFunctionName) {
-            if (!functions.contains(funcName))
-                print_error("Funcion "+funcName+" doesn't exist");
-        }
 
         return {errorNumber, warningNumber};
     }
 
     void Semantic::codeSemanticAnalyses(ASTNode& node) {
+        std::cerr << "codeSemanticAnalyses: " << node << std::endl;
         std::visit(overloads {
             [this](Int32LiteralNode& n) {},
             [this](Float32LiteralNode& n) {},
@@ -143,8 +148,9 @@ namespace nbuFrontend {
             },
             [this](VariableAccess& n) {
                 char found = 0;
+                std::cerr << "Looking up: " << n.name << " stack size: " << scopeStack.size() << std::endl;
                 for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
-                    if (it->contains(n.name))
+                    if (it->contains(n.name) || GlobalSymboleTable.contains(n.name))
                         found = 1;
                 }
                 if (!found) {
@@ -189,6 +195,7 @@ namespace nbuFrontend {
             [this](FuncCallStmtNode& n) {
                 if (!functions.contains(n.name)) {
                     unknownFunctionName.push_back(n.name);
+                    return;
                 }
                 FunctionInfo func = functions[n.name];
                 if (n.callParameters.size() != func.paramType.size()) {
@@ -208,8 +215,9 @@ namespace nbuFrontend {
                 }
             },
             [this](VariableModNode& n) {
-                if (!(scopeStack.back().contains(n.name) || GlobalSymboleTable.contains(n.name))) 
-                    print_error("The variable "+n.name+" doesn't exist");
+                for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it)
+                    if (it->contains(n.name) || GlobalSymboleTable.contains(n.name))
+                        print_error("The variable "+n.name+" doesn't exist");
                 codeSemanticAnalyses(*n.info);
                 Type retType = type_precision(*n.info);
                 SymboleInfo var = scopeStack.back().contains(n.name) ? scopeStack.back()[n.name] : GlobalSymboleTable[n.name];
@@ -255,7 +263,7 @@ namespace nbuFrontend {
             [this](const VariableAccess& n) {
                 for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
                     if (it->contains(n.name))
-                        return (*it)[n.name].type;
+                        return it->at(n.name).type;
                 }
                 if (GlobalSymboleTable.contains(n.name))
                     return GlobalSymboleTable.at(n.name).type;
@@ -274,7 +282,7 @@ namespace nbuFrontend {
         }, node);
     }
 
-    Type Semantic::resolve_type(Type left, Type right) {
+    Type Semantic::resolve_type(const Type left, const Type right) {
         if (left == right) return left;
         if (left == Type{.kind = Type::Kind::FLOAT64} || right == Type{.kind = Type::Kind::FLOAT64}) return Type{.kind = Type::Kind::FLOAT64}; 
         if (left == Type{.kind = Type::Kind::FLOAT32} || right == Type{.kind = Type::Kind::FLOAT32}) return Type{.kind = Type::Kind::FLOAT32}; 
@@ -286,7 +294,7 @@ namespace nbuFrontend {
         return Type{.kind = Type::Kind::INT32};
     }
 
-    Type Semantic::tryPromote(Type currentType, Type promoteTo) {
+    Type Semantic::tryPromote(const Type currentType, const Type promoteTo) {
         if (resolve_type(currentType, promoteTo) == promoteTo)
             return promoteTo;
         if (currentType == Type{.kind = Type::Kind::UINT32} && promoteTo == Type{.kind = Type::Kind::INT32}) return promoteTo;

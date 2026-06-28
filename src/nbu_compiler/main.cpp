@@ -119,9 +119,13 @@ int main(int argc, char **argv) {
 
   std::vector<nbuFrontend::ASTNode> nodes = parser.parse();
 
+  std::cout << "Test" << std::endl;
+
   nbuFrontend::Semantic semantic(nodes);
 
   auto [errors, warnings] = semantic.semanticAnalyses();
+
+  std::cout << "Test" << std::endl;
 
   std::cout << "The analyses ended with " << errors << " errors and " << warnings << " warnings" << std::endl;
 

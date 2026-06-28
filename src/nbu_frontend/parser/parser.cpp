@@ -14,11 +14,11 @@ template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 namespace nbuFrontend {
     Parser::Parser(const std::vector<Token>& tokens) : tokens{tokens}, cursor{0} {}
 
-    bool Type::operator!=(const Type& other) {
+    bool Type::operator!=(const Type& other) const {
         return kind != other.kind;
     }
     
-    bool Type::operator==(const Type& other) {
+    bool Type::operator==(const Type& other) const {
         return kind == other.kind;
     }
 
@@ -365,29 +365,29 @@ namespace nbuFrontend {
             std::string name = peek().val;
             consume(TokenType::IDENTIFIER);
             if (peek().type == TokenType::LPARAM)
-                astnodes.push_back(parse_function(name, type));
+                astnodes.push_back(parse_function(name, typeTable[type]));
             else
-                astnodes.push_back(parse_global_variable(name, type));
+                astnodes.push_back(parse_global_variable(name, typeTable[type]));
             }
             token = peek();
         }
         return astnodes;
     }
 
-    ASTNode Parser::parse_global_variable(const std::string& name, std::string type) {
+    ASTNode Parser::parse_global_variable(const std::string& name, Type type) {
         if (peek().type != TokenType::EQUAL) {
             consume(TokenType::SEMICOLON);
-            return VariableDeclare{ .name = name, .type = typeTable[type], .info = nullptr};
+            return VariableDeclare{ .name = name, .type = type, .info = nullptr};
         }
         consume(TokenType::EQUAL);
         ASTNode info = parse_expression(Precedence::LOWEST);
         consume(TokenType::SEMICOLON);
-        return VariableDeclare{.type = typeTable[type], .info = std::make_unique<ASTNode>(std::move(info))};
+        return VariableDeclare{.type = type, .info = std::make_unique<ASTNode>(std::move(info))};
     }
 
     ASTNode Parser::parse_parameter() {
         VariableDeclare ret;
-        if (typeTable.contains(peek().val)) {
+        if (!typeTable.contains(peek().val)) {
             print_error("Unknown type : "+peek().val);
         }
         ret.type = typeTable[peek().val];
@@ -405,9 +405,8 @@ namespace nbuFrontend {
         return ret;
     }
 
-    ASTNode Parser::parse_function(const std::string& name, std::string retValue) {
+    ASTNode Parser::parse_function(const std::string& name, Type retValue) {
         FuncStmtNode ret;
-
         ret.name = name;
         consume(TokenType::LPARAM);
         while (peek().type != TokenType::RPARAM) {
