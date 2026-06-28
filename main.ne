@@ -18,6 +18,7 @@ int32 main() {
         int32 tmp = 1;
         tmp = tmp+1;
     }
+    tmp = 4;
     vaddr data = 123;
     write32(data,32);
     x = read32(data);

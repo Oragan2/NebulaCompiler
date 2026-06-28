@@ -26,7 +26,7 @@ void print_node(const ASTNode& node) {
                 print_node(*n.expression);
             },
             [](const VariableDeclare& n) {
-                std::cout << "VariableDeclare " << n.type << " ";
+                std::cout << "VariableDeclare " << n.name << " " << n.type << " ";
                 if (n.info != nullptr)
                     print_node(*n.info);
             },
