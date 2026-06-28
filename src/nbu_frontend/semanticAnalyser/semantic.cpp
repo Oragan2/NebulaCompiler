@@ -35,9 +35,9 @@ namespace nbuFrontend {
                     GlobalSymboleTable.emplace(n.name, SymboleInfo{.type = n.type, .stack_offset = 0});
                     if (n.info != nullptr) {
                         codeSemanticAnalyses(*n.info);
-                        TokenType retType = type_precision(*n.info);
+                        Type retType = type_precision(*n.info);
                         if (retType != n.type) {
-                            TokenType promote = tryPromote(retType, n.type);
+                            Type promote = tryPromote(retType, n.type);
                             if (promote == retType) {
                                 print_error("The variable is a "+n.type+" but tryed to declare it a "+promote);
                             }
@@ -55,9 +55,9 @@ namespace nbuFrontend {
                                 scopeStack.back().emplace(n.name, SymboleInfo{n.name, n.type, 0});
                                 if (n.info != nullptr) {
                                     codeSemanticAnalyses(*n.info);
-                                    TokenType retType = type_precision(*n.info);
+                                    Type retType = type_precision(*n.info);
                                     if (retType != n.type) {
-                                        TokenType promote = tryPromote(retType, n.type);
+                                        Type promote = tryPromote(retType, n.type);
                                         if (promote == retType) {
                                             print_error("The variable is a "+n.type+" but tryed to declare it a "+promote);
                                         }
@@ -93,9 +93,9 @@ namespace nbuFrontend {
             [this](Float32LiteralNode& n) {},
             [this](ReturnStmtNode& n) {
                 codeSemanticAnalyses(*n.expression);
-                TokenType retVal = type_precision(*n.expression);
+                Type retVal = type_precision(*n.expression);
                 if (retVal != currentFunc.retType) {
-                    TokenType promoted = tryPromote(retVal, currentFunc.retType);
+                    Type promoted = tryPromote(retVal, currentFunc.retType);
                     if (promoted == retVal) {
                         print_error("function returned a different type from the announced value, returns : "+promoted+" instead of a "+currentFunc.retType);
                     }
@@ -106,11 +106,10 @@ namespace nbuFrontend {
                 codeSemanticAnalyses(*n.left);
                 codeSemanticAnalyses(*n.right);
                 if (compOp.contains(n.op)) {
-                    n.precision = TokenType::INT32;
-                    TokenType left = type_precision(*n.left);
-                    TokenType right = type_precision(*n.right);
+                    Type left = type_precision(*n.left);
+                    Type right = type_precision(*n.right);
                     if (left != right) {
-                        TokenType promote = tryPromote(left,right);
+                        Type promote = tryPromote(left,right);
                         if (promote != right) {
                             promote = tryPromote(right, left);
                             if (promote != left) {
@@ -132,9 +131,9 @@ namespace nbuFrontend {
                 scopeStack.back().emplace(n.name, SymboleInfo{n.name, n.type, 0});
                 if (n.info != nullptr) {
                     codeSemanticAnalyses(*n.info);
-                    TokenType retType = type_precision(*n.info);
+                    Type retType = type_precision(*n.info);
                     if (retType != n.type) {
-                        TokenType promote = tryPromote(retType, n.type);
+                        Type promote = tryPromote(retType, n.type);
                         if (promote == retType) {
                             print_error("The variable is a "+n.type+" but tryed to declare it a "+promote);
                         }
@@ -155,23 +154,22 @@ namespace nbuFrontend {
             [this](UnaryOpNode& n) {
                 codeSemanticAnalyses(*n.operand);
                 if (n.op == TokenType::EXCLAMATION) {
-                    TokenType typePrecision = type_precision(*n.operand);
-                    if (type_precision(*n.operand) != TokenType::INT32) {
-                        TokenType promote = tryPromote(typePrecision, TokenType::INT32);
+                    Type typePrecision = type_precision(*n.operand);
+                    if (type_precision(*n.operand) != Type{.kind = Type::Kind::INT32}) {
+                        Type promote = tryPromote(typePrecision, Type{.kind = Type::Kind::INT32});
                         if (promote == typePrecision)
                             print_error("Can't use a ! other then for boolean expression");
                         n.operand = std::make_unique<ASTNode>(PromotionNode{promote, typePrecision, std::move(n.operand)});
                     }
-                    n.precision = TokenType::INT32;
                 }
                 else
                     n.precision = type_precision(*n.operand);
             },
             [this](IfStmtNode& n) {
                 codeSemanticAnalyses(*n.condition);
-                TokenType condType = type_precision(*n.condition);
-                if (condType != TokenType::INT32) {
-                    TokenType promote = tryPromote(condType, TokenType::INT32);
+                Type condType = type_precision(*n.condition);
+                if (condType != Type{.kind = Type::Kind::INT32}) {
+                    Type promote = tryPromote(condType, Type{.kind = Type::Kind::INT32});
                     if (promote == condType) {
                         print_error("The value of the condition must be a boolean not a "+condType);
                     }
@@ -198,10 +196,10 @@ namespace nbuFrontend {
                 }
                 for (unsigned int i = 0; i < func.paramType.size() && i < n.callParameters.size(); ++i) {
                     const std::unique_ptr<ASTNode>& param = n.callParameters[i];
-                    const TokenType& type = func.paramType[i];
-                    TokenType paramType = type_precision(*param);
+                    Type& type = func.paramType[i];
+                    Type paramType = type_precision(*param);
                     if (type != paramType) {
-                        TokenType promote = tryPromote(paramType, type);
+                        Type promote = tryPromote(paramType, type);
                         if (promote == paramType) {
                             print_error("Expected argument type "+type+" but received a "+promote+" for parameter "+std::to_string(i));
                         }
@@ -213,10 +211,10 @@ namespace nbuFrontend {
                 if (!(scopeStack.back().contains(n.name) || GlobalSymboleTable.contains(n.name))) 
                     print_error("The variable "+n.name+" doesn't exist");
                 codeSemanticAnalyses(*n.info);
-                TokenType retType = type_precision(*n.info);
+                Type retType = type_precision(*n.info);
                 SymboleInfo var = scopeStack.back().contains(n.name) ? scopeStack.back()[n.name] : GlobalSymboleTable[n.name];
                 if (retType != var.type) {
-                    TokenType promote = tryPromote(retType, var.type);
+                    Type promote = tryPromote(retType, var.type);
                     if (promote == retType) {
                         print_error("The variable is a "+var.type+" but tryed to asigne a "+promote+" to it");
                     }
@@ -225,16 +223,16 @@ namespace nbuFrontend {
             },
             [this](readAddrNode& n) {
                 codeSemanticAnalyses(*n.addr);
-                TokenType addrType = type_precision(*n.addr);
-                if (addrType != TokenType::VADDR && addrType != TokenType::PADDR) {
+                Type addrType = type_precision(*n.addr);
+                if (addrType != Type{.kind = Type::Kind::VADDR} && addrType != Type{.kind = Type::Kind::PADDR}) {
                     print_error("The read function can only take an addresse and not a "+addrType);
                 }
             },
             [this](writeAddrNode& n) {
                 codeSemanticAnalyses(*n.addr);
                 codeSemanticAnalyses(*n.value);
-                TokenType addrType = type_precision(*n.addr);
-                if (addrType != TokenType::VADDR && addrType != TokenType::PADDR) {
+                Type addrType = type_precision(*n.addr);
+                if (addrType != Type{.kind = Type::Kind::VADDR} && addrType != Type{.kind = Type::Kind::PADDR}) {
                     print_error("The read function can only take an addresse and not a "+addrType);
                 }
             },
@@ -250,10 +248,10 @@ namespace nbuFrontend {
         }, node);
     }
 
-    TokenType Semantic::type_precision(const ASTNode& node) {
+    Type Semantic::type_precision(const ASTNode& node) {
         return std::visit(overloads {
-            [this](const Int32LiteralNode& n) {return TokenType::INT32;},
-            [this](const Float32LiteralNode& n) {return TokenType::FLOAT32;},
+            [this](const Int32LiteralNode& n) {return Type{.kind = Type::Kind::INT32};},
+            [this](const Float32LiteralNode& n) {return Type{.kind = Type::Kind::FLOAT32};},
             [this](const VariableAccess& n) {
                 for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
                     if (it->contains(n.name))
@@ -261,42 +259,42 @@ namespace nbuFrontend {
                 }
                 if (GlobalSymboleTable.contains(n.name))
                     return GlobalSymboleTable.at(n.name).type;
-                return TokenType::EOFTOKEN;
+                return Type{.kind = Type::Kind::INT32};
             },
             [this](const BinaryOpNode& n) {return resolve_type(type_precision(*n.left), type_precision(*n.right));},
             [this](const UnaryOpNode& n) {return type_precision(*n.operand);},
             [this](const FuncCallStmtNode& n) {return functions.at(n.name).retType;},
             [this](const readAddrNode& n ) {
-                if (n.quantity == 64) return TokenType::UINT64;
-                if (n.quantity == 32) return TokenType::UINT32;
-                if (n.quantity == 16) return TokenType::UINT32; // will change
-                else return TokenType::UINT32; // will change
+                if (n.quantity == 64) return Type{.kind = Type::Kind::UINT64};
+                if (n.quantity == 32) return Type{.kind = Type::Kind::UINT32};
+                if (n.quantity == 16) return Type{.kind = Type::Kind::UINT32}; // will change
+                else return Type{.kind = Type::Kind::UINT32}; // will change
             },
-            [this](const auto&) {print_error("Uh?"); return TokenType::EOFTOKEN;}
+            [this](const auto&) {print_error("Uh?"); return Type{.kind = Type::Kind::INT32};}
         }, node);
     }
 
-    TokenType Semantic::resolve_type(TokenType left, TokenType right) {
+    Type Semantic::resolve_type(Type left, Type right) {
         if (left == right) return left;
-        if (left == TokenType::FLOAT64 || right == TokenType::FLOAT64) return TokenType::FLOAT64; 
-        if (left == TokenType::FLOAT32 || right == TokenType::FLOAT32) return TokenType::FLOAT32; 
-        if (left == TokenType::VADDR || right == TokenType::VADDR) return TokenType::VADDR;
-        if (left == TokenType::PADDR || right == TokenType::PADDR) return TokenType::PADDR;
-        if (left == TokenType::UINT64 || right == TokenType::UINT64) return TokenType::UINT64; 
-        if (left == TokenType::INT64 || right == TokenType::INT64) return TokenType::INT64; 
-        if (left == TokenType::UINT32 || right == TokenType::UINT32) return TokenType::UINT32; 
-        return TokenType::INT32;
+        if (left == Type{.kind = Type::Kind::FLOAT64} || right == Type{.kind = Type::Kind::FLOAT64}) return Type{.kind = Type::Kind::FLOAT64}; 
+        if (left == Type{.kind = Type::Kind::FLOAT32} || right == Type{.kind = Type::Kind::FLOAT32}) return Type{.kind = Type::Kind::FLOAT32}; 
+        if (left == Type{.kind = Type::Kind::VADDR} || right == Type{.kind = Type::Kind::VADDR}) return Type{.kind = Type::Kind::VADDR};
+        if (left == Type{.kind = Type::Kind::PADDR} || right == Type{.kind = Type::Kind::PADDR}) return Type{.kind = Type::Kind::PADDR};
+        if (left == Type{.kind = Type::Kind::UINT64} || right == Type{.kind = Type::Kind::UINT64}) return Type{.kind = Type::Kind::UINT64}; 
+        if (left == Type{.kind = Type::Kind::INT64} || right == Type{.kind = Type::Kind::INT64}) return Type{.kind = Type::Kind::INT64}; 
+        if (left == Type{.kind = Type::Kind::UINT32} || right == Type{.kind = Type::Kind::UINT32}) return Type{.kind = Type::Kind::UINT32}; 
+        return Type{.kind = Type::Kind::INT32};
     }
 
-    TokenType Semantic::tryPromote(TokenType currentType, TokenType promoteTo) {
+    Type Semantic::tryPromote(Type currentType, Type promoteTo) {
         if (resolve_type(currentType, promoteTo) == promoteTo)
             return promoteTo;
-        if (currentType == TokenType::UINT32 && promoteTo == TokenType::INT32) return promoteTo;
-        if (currentType == TokenType::UINT64 && promoteTo == TokenType::INT64) return promoteTo;
-        if (currentType == TokenType::INT64 && promoteTo == TokenType::INT32) return promoteTo;
-        if (currentType == TokenType::UINT64 && promoteTo == TokenType::UINT32) return promoteTo;
-        if (currentType == TokenType::UINT64 && promoteTo == TokenType::INT32) return promoteTo;
-        if (currentType == TokenType::INT64 && promoteTo == TokenType::UINT32) return promoteTo;
+        if (currentType == Type{.kind = Type::Kind::UINT32} && promoteTo == Type{.kind = Type::Kind::INT32}) return promoteTo;
+        if (currentType == Type{.kind = Type::Kind::UINT64} && promoteTo == Type{.kind = Type::Kind::INT64}) return promoteTo;
+        if (currentType == Type{.kind = Type::Kind::INT64} && promoteTo == Type{.kind = Type::Kind::INT32}) return promoteTo;
+        if (currentType == Type{.kind = Type::Kind::UINT64} && promoteTo == Type{.kind = Type::Kind::UINT32}) return promoteTo;
+        if (currentType == Type{.kind = Type::Kind::UINT64} && promoteTo == Type{.kind = Type::Kind::INT32}) return promoteTo;
+        if (currentType == Type{.kind = Type::Kind::INT64} && promoteTo == Type{.kind = Type::Kind::UINT32}) return promoteTo;
         return currentType;
     }
 

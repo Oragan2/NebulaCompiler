@@ -1,6 +1,7 @@
 #include "parser.h"
 #include "../lexer/lexer.h"
 #include <cstdlib>
+#include <unordered_map>
 #include <unordered_set>
 #include <variant>
 #include <vector>
@@ -13,15 +14,53 @@ template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 namespace nbuFrontend {
     Parser::Parser(const std::vector<Token>& tokens) : tokens{tokens}, cursor{0} {}
 
-    std::unordered_set<TokenType> typeTable {
-        TokenType::INT32,
-        TokenType::UINT32,
-        TokenType::INT64,
-        TokenType::UINT64,
-        TokenType::FLOAT32,
-        TokenType::FLOAT64,
-        TokenType::VADDR,
-        TokenType::PADDR
+    bool Type::operator!=(const Type& other) {
+        return kind != other.kind;
+    }
+    
+    bool Type::operator==(const Type& other) {
+        return kind == other.kind;
+    }
+
+    std::string type_to_str(Type type) {
+        switch(type.kind) {
+            case Type::Kind::INT32:
+                return "int32";
+            case Type::Kind::UINT32:
+                return "uint32";
+            case Type::Kind::INT64:
+                return "int64";
+            case Type::Kind::UINT64:
+                return "uint64";
+            case Type::Kind::FLOAT32:
+                return "float32";
+            case Type::Kind::FLOAT64:
+                return "float64";
+            case Type::Kind::VADDR:
+                return "vaddr";
+            case Type::Kind::PADDR:
+                return "paddr";
+        }
+    }
+
+    std::string operator+(const std::string& str, Type type) {
+        return str+type_to_str(type);
+    }
+
+    std::ostream& operator<<(std::ostream& os, Type type) {
+        os << type_to_str(type);
+        return os;
+    }
+
+    std::unordered_map<std::string, Type> typeTable {
+        {"int32", Type{Type::Kind::INT32}},
+        {"uint32", Type{Type::Kind::UINT32}},
+        {"int64", Type{Type::Kind::INT64}},
+        {"uint64", Type{Type::Kind::UINT64}},
+        {"float32", Type{Type::Kind::FLOAT32}},
+        {"float64", Type{Type::Kind::FLOAT64}},
+        {"vaddr", Type{Type::Kind::VADDR}},
+        {"paddr", Type{Type::Kind::PADDR}}
     };
 
     std::unordered_set<std::string> readWriteNameTable {
@@ -70,7 +109,7 @@ namespace nbuFrontend {
     ASTNode Parser::parse_sentence() {
         if (peek().type == TokenType::RETURN) 
             return parse_return_sentence();        
-        else if (typeTable.find(peek().type) != typeTable.end()) 
+        else if (typeTable.contains(peek().val)) 
             return parse_local_variable_sentence();
         else if (peek().type == TokenType::IF)
             return parse_if_sentence();
@@ -184,7 +223,7 @@ namespace nbuFrontend {
     }
 
     ASTNode Parser::parse_local_variable_sentence() {
-        VariableDeclare ret = (VariableDeclare){.type = peek().type};
+        VariableDeclare ret = (VariableDeclare){.type = typeTable[peek().val]};
         consume(peek().type);
         std::string name = peek().val; 
         ret.name = name;
@@ -296,7 +335,7 @@ namespace nbuFrontend {
 
             ASTNode operand = parse_expression(Precedence::PREFIX);
 
-            left = UnaryOpNode{token.type, TokenType::EOFTOKEN, std::make_unique<ASTNode>(std::move(operand))};
+            left = UnaryOpNode{token.type, Type{Type::Kind::INT32}, std::make_unique<ASTNode>(std::move(operand))};
         } else {
             left = parse_primary();
         }
@@ -307,7 +346,7 @@ namespace nbuFrontend {
 
             ASTNode right = parse_expression(get_token_precedence(op.type));
 
-            left = BinaryOpNode{.op = op.type,.precision=TokenType::EOFTOKEN,.left = std::make_unique<ASTNode>(std::move(left)),.right = std::make_unique<ASTNode>(std::move(right))};
+            left = BinaryOpNode{.op = op.type,.precision=Type{Type::Kind::INT32},.left = std::make_unique<ASTNode>(std::move(left)),.right = std::make_unique<ASTNode>(std::move(right))};
         }
 
         return left;
@@ -317,11 +356,11 @@ namespace nbuFrontend {
         std::vector<ASTNode> astnodes;
         Token token = peek();
         while (token.type != TokenType::EOFTOKEN) {
-            if (typeTable.find(peek().type) == typeTable.end()) { // support variable & function declarations
+            if (typeTable.find(peek().val) == typeTable.end()) { // support variable & function declarations
                 print_error("Only variables or functions can be declared at file root level");
             }
             else {
-            TokenType type = peek().type;
+            std::string type = peek().val;
             consume(peek().type);
             std::string name = peek().val;
             consume(TokenType::IDENTIFIER);
@@ -335,23 +374,23 @@ namespace nbuFrontend {
         return astnodes;
     }
 
-    ASTNode Parser::parse_global_variable(const std::string& name, TokenType type) {
+    ASTNode Parser::parse_global_variable(const std::string& name, std::string type) {
         if (peek().type != TokenType::EQUAL) {
             consume(TokenType::SEMICOLON);
-            return VariableDeclare{ .name = name, .type = type, .info = nullptr};
+            return VariableDeclare{ .name = name, .type = typeTable[type], .info = nullptr};
         }
         consume(TokenType::EQUAL);
         ASTNode info = parse_expression(Precedence::LOWEST);
         consume(TokenType::SEMICOLON);
-        return VariableDeclare{.type = type, .info = std::make_unique<ASTNode>(std::move(info))};
+        return VariableDeclare{.type = typeTable[type], .info = std::make_unique<ASTNode>(std::move(info))};
     }
 
     ASTNode Parser::parse_parameter() {
         VariableDeclare ret;
-        if (typeTable.find(peek().type) == typeTable.end()) {
+        if (typeTable.contains(peek().val)) {
             print_error("Unknown type : "+peek().val);
         }
-        ret.type = peek().type;
+        ret.type = typeTable[peek().val];
         consume(peek().type);
         std::string name = peek().val;
         ret.name = name;
@@ -366,9 +405,9 @@ namespace nbuFrontend {
         return ret;
     }
 
-    ASTNode Parser::parse_function(const std::string& name, TokenType retValue) {
+    ASTNode Parser::parse_function(const std::string& name, std::string retValue) {
         FuncStmtNode ret;
-        ret.retType = retValue;
+
         ret.name = name;
         consume(TokenType::LPARAM);
         while (peek().type != TokenType::RPARAM) {
@@ -391,10 +430,4 @@ namespace nbuFrontend {
         std::cerr << "Line : " << peek().line << " Column : " << peek().column << std::endl;
         std::exit(1);
     }
-
-    void Parser::print_warning(const std::string& msg) {
-        std::cerr << "Warning : " << msg << std::endl;
-        std::cerr << "Line : " << peek().line << " Column : " << peek().column << std::endl;
-    }
-
 }

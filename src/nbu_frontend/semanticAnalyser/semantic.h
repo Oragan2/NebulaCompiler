@@ -10,14 +10,14 @@
 namespace nbuFrontend {
     struct SymboleInfo {
         std::string name;
-        TokenType type;
+        Type type;
         unsigned int stack_offset;
     };
 
     struct FunctionInfo {
         std::string name;
-        TokenType retType;
-        std::vector<TokenType> paramType;
+        Type retType;
+        std::vector<Type> paramType;
     };
 
     class Semantic {
@@ -37,9 +37,9 @@ namespace nbuFrontend {
         unsigned int warningNumber = 0;
 
         void codeSemanticAnalyses(ASTNode& node);
-        TokenType type_precision(const ASTNode& node);
-        TokenType resolve_type(TokenType left, TokenType right);
-        TokenType tryPromote(TokenType currentType, TokenType promoteTo);
+        Type type_precision(const ASTNode& node);
+        Type resolve_type(Type left, Type right);
+        Type tryPromote(Type currentType, Type promoteTo);
         void print_error(const std::string& msg);
         void print_warning(const std::string& msg);
     };

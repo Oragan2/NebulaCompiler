@@ -3,6 +3,7 @@
 
 #include "../lexer/lexer.h"
 #include <ostream>
+#include <unordered_map>
 #include <vector>
 #include <variant>
 #include <memory>
@@ -38,7 +39,13 @@ namespace nbuFrontend {
         };
         Kind kind;
         std::string name;
+        bool operator!=(const Type& other);
+        bool operator==(const Type& other);
     };
+
+    std::ostream& operator<<(std::ostream& os, Type token); 
+    std::string operator+(const std::string& str, Type token);
+    std::string type_to_str(Type token);
 
     std::ostream& operator<<(std::ostream& os, const ASTNode&);
 
@@ -56,14 +63,14 @@ namespace nbuFrontend {
 
     struct BinaryOpNode {
         TokenType op;
-        TokenType precision;
+        Type precision;
         std::unique_ptr<ASTNode> left;
         std::unique_ptr<ASTNode> right;
     };
 
     struct VariableDeclare {
         std::string name;
-        TokenType type;
+        Type type;
         std::unique_ptr<ASTNode> info;
     };
 
@@ -73,7 +80,7 @@ namespace nbuFrontend {
 
     struct UnaryOpNode {
         TokenType op;
-        TokenType precision;
+        Type precision;
         std::unique_ptr<ASTNode> operand;
     };
 
@@ -89,7 +96,7 @@ namespace nbuFrontend {
 
     struct FuncStmtNode {
         std::string name;
-        TokenType retType;
+        Type retType;
         std::vector<std::unique_ptr<ASTNode>> parameters;
         std::unique_ptr<ASTNode> code;
     };
@@ -105,8 +112,8 @@ namespace nbuFrontend {
     };
 
     struct PromotionNode {
-        TokenType topromote;
-        TokenType was;
+        Type topromote;
+        Type was;
         std::unique_ptr<ASTNode> info;
     };
 
@@ -140,6 +147,8 @@ namespace nbuFrontend {
         PRODUCT,
         PREFIX
     };
+    
+    extern std::unordered_map<std::string, Type> typeTable;
 
     class Parser {
         public:
@@ -154,16 +163,15 @@ namespace nbuFrontend {
         inline const Token& peek();
         Token consume(TokenType expected);
         [[noreturn]] void print_error(const std::string& msg);
-        void print_warning(const std::string& msg);
         ASTNode parse_sentence();
         ASTNode parse_identifier_sentence();
         ASTNode parse_function_call(const std::string& name);
         ASTNode parse_return_sentence();
         ASTNode parse_local_variable_sentence();
-        ASTNode parse_global_variable(const std::string& name, TokenType type);
+        ASTNode parse_global_variable(const std::string& name, std::string type);
         ASTNode parse_if_sentence();
         ASTNode parse_block();
-        ASTNode parse_function(const std::string& name, TokenType retValue);
+        ASTNode parse_function(const std::string& name, std::string retValue);
         ASTNode parse_parameter();
         ASTNode parse_expression(int precedence);
         ASTNode parse_primary();
