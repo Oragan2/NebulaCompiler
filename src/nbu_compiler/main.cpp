@@ -9,36 +9,36 @@
 template<class... Ts> struct overloads : Ts... { using Ts::operator()...; };
 template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 
-void print_node(const ASTNode& node) {
+void print_node(const nbuFrontend::ASTNode& node) {
     std::visit(overloads {
-            [](const Int32LiteralNode& n) {
+            [](const nbuFrontend::Int32LiteralNode& n) {
                 std::cout << "Int " << n.value << " ";
             },
-            [](const BinaryOpNode& n) {
+            [](const nbuFrontend::BinaryOpNode& n) {
                 std::cout << "BinaryOp(";
                 print_node(*n.left);
                 std::cout << " " <<  n.op << " ";
                 print_node(*n.right);
                 std::cout << ") ";
             },
-            [](const ReturnStmtNode& n) {
+            [](const nbuFrontend::ReturnStmtNode& n) {
                 std::cout << "Return ";
                 print_node(*n.expression);
             },
-            [](const VariableDeclare& n) {
+            [](const nbuFrontend::VariableDeclare& n) {
                 std::cout << "VariableDeclare " << n.name << " " << n.type << " ";
                 if (n.info != nullptr)
                     print_node(*n.info);
             },
-            [](const VariableAccess& n) {
+            [](const nbuFrontend::VariableAccess& n) {
                 std::cout << "VariableAccess " << n.name;
             },
-            [](const UnaryOpNode& n) {
+            [](const nbuFrontend::UnaryOpNode& n) {
                 std::cout << "UnaryOpNode(" << n.op;
                 print_node(*n.operand);
                 std::cout << ") ";
             },
-            [](const IfStmtNode& n) {
+            [](const nbuFrontend::IfStmtNode& n) {
                 std::cout << "if (";
                 print_node(*n.condition);
                 std::cout << ") ";
@@ -48,7 +48,7 @@ void print_node(const ASTNode& node) {
                     print_node(*n.elseNode);
                 }
             },
-            [](const BlockStmtNode& n) {
+            [](const nbuFrontend::BlockStmtNode& n) {
                 std::cout << "{\n";
                 for (const auto& sentence : n.codes) {
                     std::cout << "\t";
@@ -57,17 +57,17 @@ void print_node(const ASTNode& node) {
                 }
                 std::cout << "}";
             },
-            [](const FuncStmtNode& n) {
+            [](const nbuFrontend::FuncStmtNode& n) {
                 std::cout << "func " << n.retType << "(";
                 for(const auto& m : n.parameters)
                     print_node(*m);
                 std::cout << ") ";
                 print_node(*n.code);
             },
-            [](const Float32LiteralNode& n) {
+            [](const nbuFrontend::Float32LiteralNode& n) {
                 std::cout << "Float " << n.value << " ";
             },
-            [](const FuncCallStmtNode& n) {
+            [](const nbuFrontend::FuncCallStmtNode& n) {
                 std::cout << "Function call " << n.name << "(";
                 for (const auto& param : n.callParameters) {
                     print_node(*param);
@@ -75,31 +75,31 @@ void print_node(const ASTNode& node) {
                 }
                 std::cout << ")";
             },
-            [](const VariableModNode& n) {
+            [](const nbuFrontend::VariableModNode& n) {
                 std::cout << "VariableModification " << n.name << " ";
                 print_node(*n.info);
             },
-            [](const PromotionNode& n) {
+            [](const nbuFrontend::PromotionNode& n) {
                 std::cout << "Promotion from a " << n.was << " to a " << n.topromote << " ";
                 print_node(*n.info);
             },
-            [](const readAddrNode& n) {
+            [](const nbuFrontend::readAddrNode& n) {
                 std::cout << "Read " << n.quantity/8 << " bytes from ";
                 print_node(*n.addr);
             },
-            [](const writeAddrNode& n) {
+            [](const nbuFrontend::writeAddrNode& n) {
                 std::cout << "Write " << n.quantity/8 << " bytes from ";
                 print_node(*n.addr);
                 std::cout << " as ";
                 print_node(*n.value);
             },
-            [](const asmNode& n) {
+            [](const nbuFrontend::asmNode& n) {
                 std::cout << "asm {" << n.rawAsm << "}";
             }
             }, node);
 }
 
-void print_tree(const std::vector<ASTNode>& astnodes) {
+void print_tree(const std::vector<nbuFrontend::ASTNode>& astnodes) {
     for (const auto& astnode : astnodes) {
         print_node(astnode);
         std::cout << "\n";
@@ -113,13 +113,13 @@ int main(int argc, char **argv) {
 
   std::ifstream inputfile(argv[1]);
 
-  std::vector<Token> tokens = lexer(inputfile);
+  std::vector<nbuFrontend::Token> tokens = nbuFrontend::lexer(inputfile);
 
-  Parser parser(tokens);
+  nbuFrontend::Parser parser(tokens);
 
-  std::vector<ASTNode> nodes = parser.parse();
+  std::vector<nbuFrontend::ASTNode> nodes = parser.parse();
 
-  Semantic semantic(nodes);
+  nbuFrontend::Semantic semantic(nodes);
 
   auto [errors, warnings] = semantic.semanticAnalyses();
 
