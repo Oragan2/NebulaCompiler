@@ -3,7 +3,9 @@
 
 #include <cstddef>
 #include <iostream>
+#include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace nbuFrontend {
@@ -42,6 +44,15 @@ namespace nbuFrontend {
     struct EnumVariantInfo {
         int raw_value;
         Type backing_type;
+    };
+
+    struct StructTypeInfo {
+        std::unordered_map<std::string, Type> fields;
+    };
+
+    struct StructVariantInfo {
+        int offset;
+        Type type;
     };
 
     class ArenaAllocator {

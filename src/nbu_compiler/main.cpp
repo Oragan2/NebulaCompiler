@@ -105,6 +105,22 @@ void print_node(const nbuFrontend::ASTNode& node) {
             },
             [](const nbuFrontend::EnumAccessNode& n) {
                 std::cout << n.enumName << "::" << n.enumMember;
+            },
+            [](const nbuFrontend::StructDeclNode& n) {
+                std::cout << "struct " << n.structName << "{\n\t";
+                for (const auto& field : n.fields) {
+                    std::cout << field.first << " ";
+                    print_node(*field.second);
+                    std::cout << "\n\t";
+                }
+                std::cout << "}";
+            },
+            [](const nbuFrontend::StructAccessNode& n) {
+                std::cout << n.structName << "." << n.fieldName;
+            },
+            [](const nbuFrontend::StructModNode& n) {
+                std::cout << n.structName << "." << n.fieldName << " = ";
+                print_node(*n.info);
             }
             }, node);
 }

@@ -3,6 +3,7 @@
 
 #include "type.h"
 #include "parser.h"
+#include <string>
 #include <vector>
 #include <unordered_map>
 #include <utility>
@@ -20,6 +21,7 @@ namespace nbuFrontend {
         std::unordered_map<std::string, FunctionInfo> functions;
         std::unordered_map<std::string, SymboleInfo> globalSymbolTable;
         std::unordered_map<std::string, EnumVariantInfo> globalEnumRegistry;
+        std::unordered_map<std::string, StructTypeInfo> globalStructRegistery;
         std::vector<std::string> unknownFunctionName; //For allowing to call functions declared after it just a final quick check
         std::vector<std::unordered_map<std::string, SymboleInfo>> scopeStack;
         FunctionInfo currentFunc;

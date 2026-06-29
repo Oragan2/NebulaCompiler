@@ -19,8 +19,16 @@ enum PageFlags {
     USER = 4
 }
 
+struct TaskState {
+    uint32 back_link,
+    vaddr  esp0,
+    uint32 ss0,
+}
+
 int32 main() {
     PageFlags a = PageFlags::PRESENT;
+    TaskState b;
+    b.back_link = 12;
     int32 x = 2*2/3;
     int32 y = x+1;
     int32 z = ~y;

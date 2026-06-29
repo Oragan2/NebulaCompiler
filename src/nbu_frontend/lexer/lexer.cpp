@@ -245,7 +245,7 @@ namespace nbuFrontend {
         }
         break;
       case State::TEXT:
-        if (std::isalnum(c))
+        if (std::isalnum(c) || c == '_')
           word += c;
         else if (c == ':') {
           char next_c = file.get();

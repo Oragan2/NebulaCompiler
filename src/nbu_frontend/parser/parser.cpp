@@ -57,7 +57,10 @@ namespace nbuFrontend {
             [&](const writeAddrNode& n) {os << "write";},
             [&](const asmNode& n) {os << "asm";},
             [&](const EnumDeclNode& n) {os << "enum";},
-            [&](const EnumAccessNode& n) {os << "enumAcc";}
+            [&](const EnumAccessNode& n) {os << "enumAcc";},
+            [&](const StructDeclNode& n) {os << "struct";},
+            [&](const StructAccessNode& n) {os << "structAcc";},
+            [&](const StructModNode& n) {os << "structMod";}
         },node);
         return os;
     }
@@ -148,6 +151,22 @@ namespace nbuFrontend {
             ASTNode expr = parse_expression(Precedence::LOWEST);
             ret.info = arena.allocate<ASTNode>(expr);
             consume(TokenType::SEMICOLON);
+            return ret;
+        }
+        if (peek().type == TokenType::DOT) {
+            consume(TokenType::DOT);
+            StructModNode ret;
+            ret.structName = name;
+            ret.fieldName = peek().val;
+            consume(TokenType::IDENTIFIER);
+            if (peek().type == TokenType::EQUAL) {
+                consume(TokenType::EQUAL);
+                VariableModNode ret;
+                ret.name = name;
+                ASTNode expr = parse_expression(Precedence::LOWEST);
+                ret.info = arena.allocate<ASTNode>(expr);
+                consume(TokenType::SEMICOLON);
+            } 
             return ret;
         }
         else 
@@ -242,6 +261,12 @@ namespace nbuFrontend {
                 consume(TokenType::IDENTIFIER);
                 return EnumAccessNode{.enumName = name, .enumMember = memName};
             }
+            else if (TokenType::DOT == peek().type) {
+                consume(TokenType::DOT);
+                std::string fieldName = peek().val;
+                consume(TokenType::IDENTIFIER);
+                return StructAccessNode{name, fieldName};
+            }
             else 
                 return VariableAccessNode{.name = name};
         }
@@ -328,6 +353,9 @@ namespace nbuFrontend {
         while (token.type != TokenType::EOFTOKEN) {
             if (token.type == TokenType::ENUM) {
                 astnodes.push_back(parse_enum());
+            }
+            else if (token.type == TokenType::STRUCT) {
+                astnodes.push_back(parse_struct());
             }
             else if (typeTable.find(peek().val) == typeTable.end()) { // support variable & function declarations
                 print_error("Only variables or functions can be declared at file root level");
@@ -419,6 +447,25 @@ namespace nbuFrontend {
                 consume(TokenType::COMMA);
         }
         typeTable.emplace(name, Type{.kind = Type::Kind::ENUM, .name = name});
+        consume(TokenType::RBRAK);
+        return ret;
+    }
+
+    ASTNode Parser::parse_struct() {
+        consume(TokenType::STRUCT);
+        const std::string& name = peek().val;
+        consume(TokenType::IDENTIFIER);
+        consume(TokenType::LBRAK);
+        StructDeclNode ret;
+        ret.structName = name;
+        while (peek().type != TokenType::RBRAK) {
+            std::string fieldName = peek().val;
+            ret.fields.push_back({fieldName, arena.allocate<ASTNode>(parse_parameter())});
+            if (peek().type != TokenType::RBRAK) {
+                consume(TokenType::COMMA);
+            }
+        }
+        typeTable.emplace(name, Type{.kind = Type::Kind::STRUCT, .name = name});
         consume(TokenType::RBRAK);
         return ret;
     }

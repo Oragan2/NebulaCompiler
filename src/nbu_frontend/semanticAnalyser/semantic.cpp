@@ -74,15 +74,23 @@ namespace nbuFrontend {
                     scopeStack.pop_back();
                 },
                 [this](const EnumDeclNode& n) {
-                    for (const auto&[member,value] : n.members) {
-                        size_t max_value = 0;
-                        for (const auto& member : n.members) {
-                            if (static_cast<size_t>(member.second) > max_value) {
-                                max_value = member.second;
-                            }
+                    size_t max_value = 0;
+                    for (const auto& member : n.members) {
+                        if (static_cast<size_t>(member.second) > max_value) {
+                            max_value = member.second;
                         }
+                    }
+                    for (const auto&[member,value] : n.members) {
                         globalEnumRegistry.emplace(n.name+"::"+member, EnumVariantInfo{value, max_value > 255 ? Type{Type::Kind::UINT16} : Type{Type::Kind::UINT8}});
                     }
+                },
+                [this](const StructDeclNode& n) {
+                    StructTypeInfo info;
+                    for (const auto& [name,field] : n.fields) {
+                        //codeSemanticAnalyses(*field);
+                        info.fields.emplace(name,type_precision(*field));
+                    }
+                    globalStructRegistery.emplace(n.structName, info);
                 },
                 [this](const auto& n) {
                     print_error("only variables and function declare at file root"); // fall back incase the parser didn't already took care of it
@@ -228,7 +236,7 @@ namespace nbuFrontend {
                 }
                 codeSemanticAnalyses(*n.info);
                 Type retType = type_precision(*n.info);
-                SymboleInfo var = scopeStack.back().contains(n.name) ? scopeStack.back()[n.name] : globalSymbolTable[n.name];
+                SymboleInfo var = scopeStack.back().contains(n.name) ? scopeStack.back()[n.name] : globalSymbolTable[n.name]; // will redo the logic later
                 if (retType != var.type) {
                     Type promote = tryPromote(retType, var.type);
                     if (promote == retType) {
@@ -257,6 +265,64 @@ namespace nbuFrontend {
                 if (!globalEnumRegistry.contains(name)) {
                     print_error("unknown enum member "+name);
                 }
+            },
+            [this](StructAccessNode& n) {
+                char found = 0;
+                SymboleInfo vInfo;
+                for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
+                    if (it->contains(n.structName) || globalSymbolTable.contains(n.structName)) {
+                        found = 1;
+                        if (it->contains(n.structName))
+                            vInfo = it->at(n.structName);
+                        else
+                            vInfo = globalSymbolTable[n.structName];
+                    }
+                }
+                if (!found) {
+                    print_error("Unknown variable");
+                }
+                if (!globalStructRegistery.contains(vInfo.type.name)) {
+                    print_error("A "+vInfo.type+" cannot have fields");
+                }
+                StructTypeInfo sInfo;
+                if (!sInfo.fields.contains(n.fieldName)) {
+                    print_error("The struct "+vInfo.type+" does't have "+n.fieldName+" as a field");
+                }
+            },
+            [this](StructModNode& n) {
+                char found = 0;
+                SymboleInfo vInfo;
+                for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
+                    if (it->contains(n.structName) || globalSymbolTable.contains(n.structName)) {
+                        found = 1;
+                        if (it->contains(n.structName))
+                            vInfo = it->at(n.structName);
+                        else
+                            vInfo = globalSymbolTable[n.structName];
+                    }
+                }
+                if (!found) {
+                    print_error("Unknown variable");
+                }
+                if (!globalStructRegistery.contains(vInfo.type.name)) {
+                    print_error("A "+vInfo.type+" cannot have fields");
+                }
+                StructTypeInfo sInfo;
+                if (!sInfo.fields.contains(n.fieldName)) {
+                    print_error("The struct "+vInfo.type+" does't have "+n.fieldName+" as a field");
+                }
+                codeSemanticAnalyses(*n.info);
+                Type retType = type_precision(*n.info);
+                if (retType != vInfo.type) {
+                    Type promote = tryPromote(retType, vInfo.type);
+                    if (promote == retType) {
+                        print_error("The variable is a "+vInfo.type+" but tryed to asigne a "+promote+" to it");
+                    }
+                    n.info = arena.allocate<ASTNode>(PromotionNode{promote, retType, n.info});
+                }
+            },
+            [this](StructDeclNode& n) {
+                print_error("Can't declare an enum inside a function"); // will maybe be changed later though probably not
             },
             [this](EnumDeclNode& n) {
                 print_error("Can't declare an enum inside a function"); // will maybe be changed later though probably not

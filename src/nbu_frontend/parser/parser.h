@@ -27,7 +27,10 @@ namespace nbuFrontend {
         struct writeAddrNode,
         struct asmNode,
         struct EnumDeclNode,
-        struct EnumAccessNode
+        struct EnumAccessNode,
+        struct StructDeclNode,
+        struct StructAccessNode,
+        struct StructModNode
     >;
 
     std::ostream& operator<<(std::ostream& os, const ASTNode&);
@@ -123,6 +126,22 @@ namespace nbuFrontend {
     struct EnumAccessNode {
         std::string enumName;
         std::string enumMember;
+    };
+
+    struct StructDeclNode {
+        std::string structName;
+        std::vector<std::pair<std::string,ASTNode*>> fields;
+    };
+    
+    struct StructAccessNode {
+        std::string structName;
+        std::string fieldName;
+    };
+
+    struct StructModNode {
+        std::string structName;
+        std::string fieldName;
+        ASTNode* info;
     };
 
     enum Precedence {
