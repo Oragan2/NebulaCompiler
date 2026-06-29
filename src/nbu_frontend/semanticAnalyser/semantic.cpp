@@ -88,7 +88,7 @@ namespace nbuFrontend {
                     StructTypeInfo info;
                     for (const auto& [name,field] : n.fields) {
                         //codeSemanticAnalyses(*field);
-                        info.fields.emplace(name,type_precision(*field));
+                        info.fields.emplace(name,field);
                     }
                     globalStructRegistery.emplace(n.structName, info);
                 },

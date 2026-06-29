@@ -459,8 +459,12 @@ namespace nbuFrontend {
         StructDeclNode ret;
         ret.structName = name;
         while (peek().type != TokenType::RBRAK) {
-            std::string fieldName = peek().val;
-            ret.fields.push_back({fieldName, arena.allocate<ASTNode>(parse_parameter())});
+            std::string typeName = peek().val;
+            Type type = typeTable[typeName];
+	    consume(peek().type);
+	    std::string fieldName = peek().val;
+	    ret.fields.emplace_back(fieldName, type);
+	    consume(TokenType::IDENTIFIER);
             if (peek().type != TokenType::RBRAK) {
                 consume(TokenType::COMMA);
             }

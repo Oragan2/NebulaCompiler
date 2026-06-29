@@ -109,8 +109,7 @@ void print_node(const nbuFrontend::ASTNode& node) {
             [](const nbuFrontend::StructDeclNode& n) {
                 std::cout << "struct " << n.structName << "{\n\t";
                 for (const auto& field : n.fields) {
-                    std::cout << field.first << " ";
-                    print_node(*field.second);
+                    std::cout << field.first << " " << field.second;
                     std::cout << "\n\t";
                 }
                 std::cout << "}";

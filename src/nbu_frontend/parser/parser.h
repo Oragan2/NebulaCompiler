@@ -130,7 +130,7 @@ namespace nbuFrontend {
 
     struct StructDeclNode {
         std::string structName;
-        std::vector<std::pair<std::string,ASTNode*>> fields;
+        std::vector<std::pair<std::string,Type>> fields; // temporary until I find a better way to have preinitialized values
     };
     
     struct StructAccessNode {
