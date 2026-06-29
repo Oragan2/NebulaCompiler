@@ -1,13 +1,13 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "../lexer/lexer.h"
+#include "lexer.h"
+#include "type.h"
 #include <ostream>
-#include <unordered_map>
 #include <vector>
 #include <variant>
-#include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace nbuFrontend {
     using ASTNode = std::variant<
@@ -29,23 +29,6 @@ namespace nbuFrontend {
         struct asmNode
     >;
 
-    struct Type {
-        enum class Kind {
-            FLOAT32, FLOAT64,
-            INT32, INT64,
-            UINT32, UINT64,
-            VADDR, PADDR
-        };
-        Kind kind;
-        std::string name;
-        bool operator!=(const Type& other) const;
-        bool operator==(const Type& other) const;
-    };
-
-    std::ostream& operator<<(std::ostream& os, Type token); 
-    std::string operator+(const std::string& str, Type token);
-    std::string type_to_str(Type token);
-
     std::ostream& operator<<(std::ostream& os, const ASTNode&);
 
     struct Int32LiteralNode {
@@ -57,20 +40,20 @@ namespace nbuFrontend {
     };
 
     struct ReturnStmtNode {
-        std::unique_ptr<ASTNode> expression;
+        ASTNode* expression;
     };
 
     struct BinaryOpNode {
         TokenType op;
         Type precision;
-        std::unique_ptr<ASTNode> left;
-        std::unique_ptr<ASTNode> right;
+        ASTNode* left;
+        ASTNode* right;
     };
 
     struct VariableDeclare {
         std::string name;
         Type type;
-        std::unique_ptr<ASTNode> info;
+        ASTNode* info;
     };
 
     struct VariableAccess {
@@ -80,51 +63,51 @@ namespace nbuFrontend {
     struct UnaryOpNode {
         TokenType op;
         Type precision;
-        std::unique_ptr<ASTNode> operand;
+        ASTNode* operand;
     };
 
     struct IfStmtNode {
-        std::unique_ptr<ASTNode> condition;
-        std::unique_ptr<ASTNode> ifNode;
-        std::unique_ptr<ASTNode> elseNode;
+        ASTNode* condition;
+        ASTNode* ifNode;
+        ASTNode* elseNode;
     };
 
     struct BlockStmtNode {
-        std::vector<std::unique_ptr<ASTNode>> codes;
+        std::vector<ASTNode*> codes;
     };
 
     struct FuncStmtNode {
         std::string name;
         Type retType;
-        std::vector<std::unique_ptr<ASTNode>> parameters;
-        std::unique_ptr<ASTNode> code;
+        std::vector<ASTNode*> parameters;
+        ASTNode* code;
     };
 
     struct FuncCallStmtNode {
         std::string name;
-        std::vector<std::unique_ptr<ASTNode>> callParameters;
+        std::vector<ASTNode*> callParameters;
     };
 
     struct VariableModNode {
         std::string name;
-        std::unique_ptr<ASTNode> info;
+        ASTNode* info;
     };
 
     struct PromotionNode {
         Type topromote;
         Type was;
-        std::unique_ptr<ASTNode> info;
+        ASTNode* info;
     };
 
     struct readAddrNode {
-        std::unique_ptr<ASTNode> addr;
+        ASTNode* addr;
         int8_t quantity;
     };
 
     struct writeAddrNode {
-        std::unique_ptr<ASTNode> addr;
+        ASTNode* addr;
         int8_t quantity;
-        std::unique_ptr<ASTNode> value;
+        ASTNode* value;
     };
 
     struct asmNode {

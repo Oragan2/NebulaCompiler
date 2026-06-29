@@ -1,7 +1,7 @@
 #include "semantic.h"
+#include "type.h"
 #include "lexer.h"
 #include "parser.h"
-#include <memory>
 #include <unordered_set>
 #include <utility>
 #include <variant>
@@ -41,14 +41,14 @@ namespace nbuFrontend {
                             if (promote == retType) {
                                 print_error("The variable is a "+n.type+" but tryed to declare it a "+promote);
                             }
-                            n.info = std::make_unique<ASTNode>(PromotionNode{promote, retType, std::move(n.info)});
+                            n.info = arena.allocate<ASTNode>(PromotionNode{promote, retType, n.info});
                         }
                     }
                 },
                 [this](FuncStmtNode& n) {
                     currentFunc = FunctionInfo{.name = n.name, .retType = n.retType};
                     scopeStack.push_back({});
-                    for (std::unique_ptr<ASTNode>& parameterNode : n.parameters) {
+                    for (ASTNode*& parameterNode : n.parameters) {
                         std::visit(overloads {
                             [this](VariableDeclare& n) {
                                 currentFunc.paramType.emplace_back(n.type);
@@ -61,7 +61,7 @@ namespace nbuFrontend {
                                         if (promote == retType) {
                                             print_error("The variable is a "+n.type+" but tryed to declare it a "+promote);
                                         }
-                                        n.info = std::make_unique<ASTNode>(PromotionNode{promote, retType, std::move(n.info)});
+                                        n.info = arena.allocate<ASTNode>(PromotionNode{promote, retType, n.info});
                                     }
                                 }
                             },
@@ -94,8 +94,8 @@ namespace nbuFrontend {
                     if (promoted == retVal) {
                         print_error("function returned a different type from the announced value, returns : "+promoted+" instead of a "+currentFunc.retType);
                     }
-                    PromotionNode node{promoted, retVal, std::move(n.expression)};
-                    n.expression = std::make_unique<ASTNode>(std::move(node));
+                    PromotionNode node{promoted, retVal, n.expression};
+                    n.expression = arena.allocate<ASTNode>(node);
                 }
             },
             [this](BinaryOpNode& n) {
@@ -111,9 +111,9 @@ namespace nbuFrontend {
                             if (promote != left) {
                                 print_error("Can't compare a "+left+" to a "+right);
                             }
-                            n.right = std::make_unique<ASTNode>(PromotionNode{right,promote,std::move(n.right)});
+                            n.right = arena.allocate<ASTNode>(PromotionNode{right,promote,n.right});
                         }
-                        n.left = std::make_unique<ASTNode>(PromotionNode{promote,left,std::move(n.left)});
+                        n.left = arena.allocate<ASTNode>(PromotionNode{promote,left,n.left});
                     }
                 }
                 else {
@@ -135,7 +135,7 @@ namespace nbuFrontend {
                         if (promote == retType) {
                             print_error("The variable is a "+n.type+" but tryed to declare it a "+promote);
                         }
-                        n.info = std::make_unique<ASTNode>(PromotionNode{promote, retType, std::move(n.info)});
+                        n.info = arena.allocate<ASTNode>(PromotionNode{promote, retType, n.info});
                     }
                 }
             },
@@ -157,7 +157,7 @@ namespace nbuFrontend {
                         Type promote = tryPromote(typePrecision, Type{.kind = Type::Kind::INT32});
                         if (promote == typePrecision)
                             print_error("Can't use a ! other then for boolean expression");
-                        n.operand = std::make_unique<ASTNode>(PromotionNode{promote, typePrecision, std::move(n.operand)});
+                        n.operand = arena.allocate<ASTNode>(PromotionNode{promote, typePrecision, n.operand});
                     }
                 }
                 else
@@ -171,7 +171,7 @@ namespace nbuFrontend {
                     if (promote == condType) {
                         print_error("The value of the condition must be a boolean not a "+condType);
                     }
-                    n.condition = std::make_unique<ASTNode>(PromotionNode{promote, condType, std::move(n.condition)});
+                    n.condition = arena.allocate<ASTNode>(PromotionNode{promote, condType, n.condition});
                 }
                 codeSemanticAnalyses(*n.ifNode);
                 if (n.elseNode != nullptr)
@@ -179,7 +179,7 @@ namespace nbuFrontend {
             },
             [this](BlockStmtNode& n) {
                 scopeStack.push_back({});
-                for (std::unique_ptr<ASTNode>& blockNode : n.codes) {
+                for (ASTNode*& blockNode : n.codes) {
                     codeSemanticAnalyses(*blockNode);
                 }
                 scopeStack.pop_back();
@@ -194,7 +194,7 @@ namespace nbuFrontend {
                     print_error("The function "+func.name+" only take "+std::to_string(func.paramType.size())+" arguments but "+std::to_string(n.callParameters.size())+" where given");
                 }
                 for (unsigned int i = 0; i < func.paramType.size() && i < n.callParameters.size(); ++i) {
-                    const std::unique_ptr<ASTNode>& param = n.callParameters[i];
+                    const ASTNode* param = n.callParameters[i];
                     Type& type = func.paramType[i];
                     Type paramType = type_precision(*param);
                     if (type != paramType) {
@@ -202,7 +202,7 @@ namespace nbuFrontend {
                         if (promote == paramType) {
                             print_error("Expected argument type "+type+" but received a "+promote+" for parameter "+std::to_string(i));
                         }
-                        n.callParameters[i] = std::make_unique<ASTNode>(PromotionNode{promote, paramType, std::move(n.callParameters[i])});
+                        n.callParameters[i] = arena.allocate<ASTNode>(PromotionNode{promote, paramType, n.callParameters[i]});
                     } 
                 }
             },
@@ -223,7 +223,7 @@ namespace nbuFrontend {
                     if (promote == retType) {
                         print_error("The variable is a "+var.type+" but tryed to asigne a "+promote+" to it");
                     }
-                    n.info = std::make_unique<ASTNode>(PromotionNode{promote, retType, std::move(n.info)});
+                    n.info = arena.allocate<ASTNode>(PromotionNode{promote, retType, n.info});
                 }
             },
             [this](readAddrNode& n) {

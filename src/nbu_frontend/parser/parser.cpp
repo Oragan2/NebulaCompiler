@@ -1,3 +1,4 @@
+#include "type.h"
 #include "parser.h"
 #include "../lexer/lexer.h"
 #include <cstdlib>
@@ -13,46 +14,6 @@ template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 
 namespace nbuFrontend {
     Parser::Parser(const std::vector<Token>& tokens) : tokens{tokens}, cursor{0} {}
-
-    bool Type::operator!=(const Type& other) const {
-        return kind != other.kind;
-    }
-    
-    bool Type::operator==(const Type& other) const {
-        return kind == other.kind;
-    }
-
-    std::string type_to_str(Type type) {
-        switch(type.kind) {
-            case Type::Kind::INT32:
-                return "int32";
-            case Type::Kind::UINT32:
-                return "uint32";
-            case Type::Kind::INT64:
-                return "int64";
-            case Type::Kind::UINT64:
-                return "uint64";
-            case Type::Kind::FLOAT32:
-                return "float32";
-            case Type::Kind::FLOAT64:
-                return "float64";
-            case Type::Kind::VADDR:
-                return "vaddr";
-            case Type::Kind::PADDR:
-                return "paddr";
-            default:
-                return "Unknown Type";
-        }
-    }
-
-    std::string operator+(const std::string& str, Type type) {
-        return str+type_to_str(type);
-    }
-
-    std::ostream& operator<<(std::ostream& os, Type type) {
-        os << type_to_str(type);
-        return os;
-    }
 
     std::unordered_map<std::string, Type> typeTable {
         {"int32", Type{Type::Kind::INT32}},
@@ -138,7 +99,7 @@ namespace nbuFrontend {
         FuncCallStmtNode ret;
         while (peek().type != TokenType::RPARAM) {
             ASTNode expr = parse_expression(Precedence::LOWEST);
-            ret.callParameters.push_back(std::make_unique<ASTNode>(std::move(expr)));
+            ret.callParameters.push_back(arena.allocate<ASTNode>(expr));
             if (peek().type != TokenType::RPARAM)
                 consume(TokenType::COMMA);
         }
@@ -156,7 +117,7 @@ namespace nbuFrontend {
             if (name.find("read") != std::string::npos) {
                 readAddrNode ret;
                 ret.quantity = std::stoi(name.data()+4);
-                ret.addr = std::make_unique<ASTNode>(std::move(addr));
+                ret.addr = arena.allocate<ASTNode>(addr);
                 consume(TokenType::RPARAM);
                 consume(TokenType::SEMICOLON);
                 return ret;
@@ -164,9 +125,9 @@ namespace nbuFrontend {
             else {
                 writeAddrNode ret;
                 ret.quantity = std::stoi(name.data()+5);
-                ret.addr = std::make_unique<ASTNode>(std::move(addr));
+                ret.addr = arena.allocate<ASTNode>(addr);
                 consume(TokenType::COMMA);
-                ret.value = std::make_unique<ASTNode>(std::move(parse_expression(Precedence::LOWEST)));
+                ret.value = arena.allocate<ASTNode>(parse_expression(Precedence::LOWEST));
                 consume(TokenType::RPARAM);
                 consume(TokenType::SEMICOLON);
                 return ret;
@@ -183,7 +144,7 @@ namespace nbuFrontend {
             VariableModNode ret;
             ret.name = name;
             ASTNode expr = parse_expression(Precedence::LOWEST);
-            ret.info = std::make_unique<ASTNode>(std::move(expr));
+            ret.info = arena.allocate<ASTNode>(expr);
             consume(TokenType::SEMICOLON);
             return ret;
         }
@@ -196,17 +157,17 @@ namespace nbuFrontend {
         consume(TokenType::IF);
         consume(TokenType::LPARAM);
         ASTNode condition = parse_expression(Precedence::LOWEST);
-        ret.condition = std::make_unique<ASTNode>(std::move(condition));
+        ret.condition = arena.allocate<ASTNode>(condition);
         consume(TokenType::RPARAM);
 
         if (peek().type == TokenType::LBRAK) 
-            ret.ifNode = std::make_unique<ASTNode>(std::move(parse_block()));
+            ret.ifNode = arena.allocate<ASTNode>(parse_block());
         else 
-            ret.ifNode = std::make_unique<ASTNode>(std::move(parse_sentence()));
+            ret.ifNode = arena.allocate<ASTNode>(parse_sentence());
         
         if (peek().type == TokenType::ELSE) {
             consume(TokenType::ELSE);
-            ret.elseNode = std::make_unique<ASTNode>(std::move(parse_sentence()));
+            ret.elseNode = arena.allocate<ASTNode>(parse_sentence());
         }
         else
             ret.elseNode = nullptr;
@@ -218,7 +179,7 @@ namespace nbuFrontend {
         consume(TokenType::LBRAK);
         BlockStmtNode ret;
         while (peek().type != TokenType::RBRAK) {
-            ret.codes.push_back(std::move(std::make_unique<ASTNode>(parse_sentence())));
+            ret.codes.push_back(arena.allocate<ASTNode>(parse_sentence()));
         }
         consume(TokenType::RBRAK);
         return ret;
@@ -233,7 +194,7 @@ namespace nbuFrontend {
         if (peek().type == TokenType::EQUAL) {
             consume(TokenType::EQUAL);
             ASTNode info = parse_expression(Precedence::LOWEST);
-            ret.info = std::make_unique<ASTNode>(std::move(info));
+            ret.info = arena.allocate<ASTNode>(info);
         }
         else 
             ret.info = nullptr;
@@ -247,7 +208,7 @@ namespace nbuFrontend {
         consume(TokenType::RETURN);
         ASTNode expr = parse_expression(Precedence::LOWEST);
         consume(TokenType::SEMICOLON);
-        return ReturnStmtNode{std::make_unique<ASTNode>(std::move(expr))};
+        return ReturnStmtNode{arena.allocate<ASTNode>(expr)};
     }
 
     ASTNode Parser::parse_primary() {
@@ -259,7 +220,7 @@ namespace nbuFrontend {
             if (name.find("read") != std::string::npos) {
                 readAddrNode ret;
                 ret.quantity = std::stoi(name.data()+4);
-                ret.addr = std::make_unique<ASTNode>(std::move(addr));
+                ret.addr = arena.allocate<ASTNode>(addr);
                 consume(TokenType::RPARAM);
                 return ret;
             }
@@ -337,7 +298,7 @@ namespace nbuFrontend {
 
             ASTNode operand = parse_expression(Precedence::PREFIX);
 
-            left = UnaryOpNode{token.type, Type{Type::Kind::INT32}, std::make_unique<ASTNode>(std::move(operand))};
+            left = UnaryOpNode{token.type, Type{Type::Kind::INT32}, arena.allocate<ASTNode>(operand)};
         } else {
             left = parse_primary();
         }
@@ -348,7 +309,7 @@ namespace nbuFrontend {
 
             ASTNode right = parse_expression(get_token_precedence(op.type));
 
-            left = BinaryOpNode{.op = op.type,.precision=Type{Type::Kind::INT32},.left = std::make_unique<ASTNode>(std::move(left)),.right = std::make_unique<ASTNode>(std::move(right))};
+            left = BinaryOpNode{.op = op.type,.precision=Type{Type::Kind::INT32},.left = arena.allocate<ASTNode>(left),.right = arena.allocate<ASTNode>(right)};
         }
 
         return left;
@@ -384,7 +345,7 @@ namespace nbuFrontend {
         consume(TokenType::EQUAL);
         ASTNode info = parse_expression(Precedence::LOWEST);
         consume(TokenType::SEMICOLON);
-        return VariableDeclare{.name = name, .type = type, .info = std::make_unique<ASTNode>(std::move(info))};
+        return VariableDeclare{.name = name, .type = type, .info = arena.allocate<ASTNode>(info)};
     }
 
     ASTNode Parser::parse_parameter() {
@@ -399,7 +360,7 @@ namespace nbuFrontend {
         consume(TokenType::IDENTIFIER);
         if (peek().type == TokenType::EQUAL) {
             consume(TokenType::EQUAL);
-            ret.info = std::make_unique<ASTNode>(std::move(parse_expression(Precedence::LOWEST)));
+            ret.info = arena.allocate<ASTNode>(parse_expression(Precedence::LOWEST));
         }
         else
             ret.info = nullptr;
@@ -413,17 +374,17 @@ namespace nbuFrontend {
         ret.retType = retValue;
         consume(TokenType::LPARAM);
         while (peek().type != TokenType::RPARAM) {
-            ret.parameters.push_back(std::make_unique<ASTNode>(std::move(parse_parameter())));
+            ret.parameters.push_back(arena.allocate<ASTNode>(parse_parameter()));
             if (peek().type != TokenType::RPARAM)
                 consume(TokenType::COMMA);
         }
         consume(TokenType::RPARAM);
         if (peek().type == TokenType::LBRAK) 
-            ret.code = std::make_unique<ASTNode>(std::move(parse_block()));
+            ret.code = arena.allocate<ASTNode>(parse_block());
         else if (peek().type == TokenType::SEMICOLON)
             ret.code = nullptr;
         else 
-            ret.code = std::make_unique<ASTNode>(std::move(parse_sentence()));
+            ret.code = arena.allocate<ASTNode>(parse_sentence());
         return ret; 
     }
 

@@ -1,6 +1,7 @@
 #ifndef SEMANTIC_H
 #define SEMANTIC_H
 
+#include "type.h"
 #include "parser.h"
 #include <vector>
 #include <unordered_map>
