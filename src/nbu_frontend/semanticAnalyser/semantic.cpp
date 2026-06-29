@@ -30,7 +30,6 @@ namespace nbuFrontend {
 
     std::pair<int, int> Semantic::semanticAnalyses() {
         for (ASTNode& node : nodes) {
-            std::cout << node << std::endl;
             std::visit(overloads {
                 [this](VariableDeclare& n) {
                     GlobalSymboleTable.emplace(n.name, SymboleInfo{.type = n.type, .stack_offset = 0});
@@ -49,11 +48,9 @@ namespace nbuFrontend {
                 [this](FuncStmtNode& n) {
                     currentFunc = FunctionInfo{.name = n.name, .retType = n.retType};
                     scopeStack.push_back({});
-                    std::cerr << "After push, stack size: " << scopeStack.size() << std::endl;
                     for (std::unique_ptr<ASTNode>& parameterNode : n.parameters) {
                         std::visit(overloads {
                             [this](VariableDeclare& n) {
-                                std::cout << n.name << std::endl;
                                 currentFunc.paramType.emplace_back(n.type);
                                 scopeStack.back().emplace(n.name, SymboleInfo{n.name, n.type, 0});
                                 if (n.info != nullptr) {
@@ -71,12 +68,6 @@ namespace nbuFrontend {
                             [this](auto& n) {print_error("only variable declaration can be done in the function declaration"); }
                         },*parameterNode);
                     }
-
-                    std::cerr << "Before body, stack size: " << scopeStack.size() << std::endl;
-                        for (auto& scope : scopeStack)
-                            for (auto& [name, info] : scope)
-                                std::cerr << "  var: " << name << std::endl;
-
                     functions.emplace(currentFunc.name, currentFunc);
                     if (n.code != nullptr)
                         codeSemanticAnalyses(*n.code);
@@ -92,7 +83,6 @@ namespace nbuFrontend {
     }
 
     void Semantic::codeSemanticAnalyses(ASTNode& node) {
-        std::cerr << "codeSemanticAnalyses: " << node << std::endl;
         std::visit(overloads {
             [this](Int32LiteralNode& n) {},
             [this](Float32LiteralNode& n) {},
@@ -104,7 +94,8 @@ namespace nbuFrontend {
                     if (promoted == retVal) {
                         print_error("function returned a different type from the announced value, returns : "+promoted+" instead of a "+currentFunc.retType);
                     }
-                    n.expression = std::make_unique<ASTNode>(PromotionNode{promoted, retVal, std::move(n.expression)});
+                    PromotionNode node{promoted, retVal, std::move(n.expression)};
+                    n.expression = std::make_unique<ASTNode>(std::move(node));
                 }
             },
             [this](BinaryOpNode& n) {
@@ -126,7 +117,9 @@ namespace nbuFrontend {
                     }
                 }
                 else {
-                    n.precision = resolve_type(type_precision(*n.left), type_precision(*n.right)); // didn't find another way
+                    Type l = type_precision(*n.left);
+                    Type r = type_precision(*n.right);
+                    n.precision = resolve_type(l, r);
                 }
             },
             [this](VariableDeclare& n) {
@@ -148,7 +141,6 @@ namespace nbuFrontend {
             },
             [this](VariableAccess& n) {
                 char found = 0;
-                std::cerr << "Looking up: " << n.name << " stack size: " << scopeStack.size() << std::endl;
                 for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
                     if (it->contains(n.name) || GlobalSymboleTable.contains(n.name))
                         found = 1;
@@ -215,9 +207,14 @@ namespace nbuFrontend {
                 }
             },
             [this](VariableModNode& n) {
+                bool found = 0;
                 for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it)
-                    if (it->contains(n.name) || GlobalSymboleTable.contains(n.name))
-                        print_error("The variable "+n.name+" doesn't exist");
+                    if (it->contains(n.name))
+                        found = 1;
+                if (GlobalSymboleTable.contains(n.name)) found = 1;
+                if (!found) {
+                    print_error("The variable "+n.name+" doesn't exist");
+                }
                 codeSemanticAnalyses(*n.info);
                 Type retType = type_precision(*n.info);
                 SymboleInfo var = scopeStack.back().contains(n.name) ? scopeStack.back()[n.name] : GlobalSymboleTable[n.name];

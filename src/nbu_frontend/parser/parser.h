@@ -166,8 +166,8 @@ namespace nbuFrontend {
         ASTNode parse_identifier_sentence();
         ASTNode parse_function_call(const std::string& name);
         ASTNode parse_return_sentence();
-        ASTNode parse_local_variable_sentence();
-        ASTNode parse_global_variable(const std::string& name, Type type);
+        ASTNode parse_variable_sentence();
+        ASTNode parse_variable_sentence(const std::string& name, Type type);
         ASTNode parse_if_sentence();
         ASTNode parse_block();
         ASTNode parse_function(const std::string& name, Type retValue);

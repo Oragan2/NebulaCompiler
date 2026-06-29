@@ -40,6 +40,8 @@ namespace nbuFrontend {
                 return "vaddr";
             case Type::Kind::PADDR:
                 return "paddr";
+            default:
+                return "Unknown Type";
         }
     }
 
@@ -110,7 +112,7 @@ namespace nbuFrontend {
         if (peek().type == TokenType::RETURN) 
             return parse_return_sentence();        
         else if (typeTable.contains(peek().val)) 
-            return parse_local_variable_sentence();
+            return parse_variable_sentence();
         else if (peek().type == TokenType::IF)
             return parse_if_sentence();
         else if (peek().type == TokenType::IDENTIFIER)
@@ -222,7 +224,7 @@ namespace nbuFrontend {
         return ret;
     }
 
-    ASTNode Parser::parse_local_variable_sentence() {
+    ASTNode Parser::parse_variable_sentence() {
         VariableDeclare ret = (VariableDeclare){.type = typeTable[peek().val]};
         consume(peek().type);
         std::string name = peek().val; 
@@ -367,14 +369,14 @@ namespace nbuFrontend {
             if (peek().type == TokenType::LPARAM)
                 astnodes.push_back(parse_function(name, typeTable[type]));
             else
-                astnodes.push_back(parse_global_variable(name, typeTable[type]));
+                astnodes.push_back(parse_variable_sentence(name, typeTable[type]));
             }
             token = peek();
         }
         return astnodes;
     }
 
-    ASTNode Parser::parse_global_variable(const std::string& name, Type type) {
+    ASTNode Parser::parse_variable_sentence(const std::string& name, Type type) {
         if (peek().type != TokenType::EQUAL) {
             consume(TokenType::SEMICOLON);
             return VariableDeclare{ .name = name, .type = type, .info = nullptr};
@@ -382,7 +384,7 @@ namespace nbuFrontend {
         consume(TokenType::EQUAL);
         ASTNode info = parse_expression(Precedence::LOWEST);
         consume(TokenType::SEMICOLON);
-        return VariableDeclare{.type = type, .info = std::make_unique<ASTNode>(std::move(info))};
+        return VariableDeclare{.name = name, .type = type, .info = std::make_unique<ASTNode>(std::move(info))};
     }
 
     ASTNode Parser::parse_parameter() {
@@ -408,6 +410,7 @@ namespace nbuFrontend {
     ASTNode Parser::parse_function(const std::string& name, Type retValue) {
         FuncStmtNode ret;
         ret.name = name;
+        ret.retType = retValue;
         consume(TokenType::LPARAM);
         while (peek().type != TokenType::RPARAM) {
             ret.parameters.push_back(std::make_unique<ASTNode>(std::move(parse_parameter())));

@@ -8,6 +8,7 @@ int64 test2(uint32 i, int64 v) {
 }
 
 int32 main() {
+    int32 a;
     int32 x = 2*2/3;
     int32 y = x+1;
     int32 z = ~y;
@@ -22,6 +23,7 @@ int32 main() {
     vaddr data = 123;
     write32(data,32);
     x = read32(data);
+    cart = 13.1;
     asm {
         xor rax, rax
     }
