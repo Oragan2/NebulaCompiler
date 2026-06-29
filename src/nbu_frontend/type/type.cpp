@@ -20,6 +20,14 @@ namespace nbuFrontend {
                 return "int32";
             case Type::Kind::UINT32:
                 return "uint32";
+            case Type::Kind::INT16:
+                return "int16";
+            case Type::Kind::UINT16:
+                return "uint16";
+            case Type::Kind::INT8:
+                return "int8";
+            case Type::Kind::UINT8:
+                return "uint8";
             case Type::Kind::INT64:
                 return "int64";
             case Type::Kind::UINT64:
@@ -32,6 +40,10 @@ namespace nbuFrontend {
                 return "vaddr";
             case Type::Kind::PADDR:
                 return "paddr";
+            case Type::Kind::ENUM:
+                return "enum "+type.name;
+            case Type::Kind::STRUCT:
+                return "struct "+type.name;
             default:
                 return "Unknown Type";
         }

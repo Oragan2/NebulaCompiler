@@ -31,8 +31,8 @@ namespace nbuFrontend {
     std::pair<int, int> Semantic::semanticAnalyses() {
         for (ASTNode& node : nodes) {
             std::visit(overloads {
-                [this](VariableDeclare& n) {
-                    GlobalSymboleTable.emplace(n.name, SymboleInfo{.type = n.type, .stack_offset = 0});
+                [this](VariableDeclareNode& n) {
+                    globalSymbolTable.emplace(n.name, SymboleInfo{.type = n.type, .stack_offset = 0});
                     if (n.info != nullptr) {
                         codeSemanticAnalyses(*n.info);
                         Type retType = type_precision(*n.info);
@@ -50,7 +50,7 @@ namespace nbuFrontend {
                     scopeStack.push_back({});
                     for (ASTNode*& parameterNode : n.parameters) {
                         std::visit(overloads {
-                            [this](VariableDeclare& n) {
+                            [this](VariableDeclareNode& n) {
                                 currentFunc.paramType.emplace_back(n.type);
                                 scopeStack.back().emplace(n.name, SymboleInfo{n.name, n.type, 0});
                                 if (n.info != nullptr) {
@@ -72,6 +72,17 @@ namespace nbuFrontend {
                     if (n.code != nullptr)
                         codeSemanticAnalyses(*n.code);
                     scopeStack.pop_back();
+                },
+                [this](const EnumDeclNode& n) {
+                    for (const auto&[member,value] : n.members) {
+                        size_t max_value = 0;
+                        for (const auto& member : n.members) {
+                            if (static_cast<size_t>(member.second) > max_value) {
+                                max_value = member.second;
+                            }
+                        }
+                        globalEnumRegistry.emplace(n.name+"::"+member, EnumVariantInfo{value, max_value > 255 ? Type{Type::Kind::UINT16} : Type{Type::Kind::UINT8}});
+                    }
                 },
                 [this](const auto& n) {
                     print_error("only variables and function declare at file root"); // fall back incase the parser didn't already took care of it
@@ -122,7 +133,7 @@ namespace nbuFrontend {
                     n.precision = resolve_type(l, r);
                 }
             },
-            [this](VariableDeclare& n) {
+            [this](VariableDeclareNode& n) {
                 if (scopeStack.back().contains(n.name)) {
                     print_error("Variable "+n.name+" was already declared somewhere else");
                 }
@@ -133,16 +144,16 @@ namespace nbuFrontend {
                     if (retType != n.type) {
                         Type promote = tryPromote(retType, n.type);
                         if (promote == retType) {
-                            print_error("The variable is a "+n.type+" but tryed to declare it a "+promote);
+                            print_error("The variable is a "+n.type+" but tried to declare it a "+promote);
                         }
                         n.info = arena.allocate<ASTNode>(PromotionNode{promote, retType, n.info});
                     }
                 }
             },
-            [this](VariableAccess& n) {
+            [this](VariableAccessNode& n) {
                 char found = 0;
                 for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
-                    if (it->contains(n.name) || GlobalSymboleTable.contains(n.name))
+                    if (it->contains(n.name) || globalSymbolTable.contains(n.name))
                         found = 1;
                 }
                 if (!found) {
@@ -211,13 +222,13 @@ namespace nbuFrontend {
                 for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it)
                     if (it->contains(n.name))
                         found = 1;
-                if (GlobalSymboleTable.contains(n.name)) found = 1;
+                if (globalSymbolTable.contains(n.name)) found = 1;
                 if (!found) {
                     print_error("The variable "+n.name+" doesn't exist");
                 }
                 codeSemanticAnalyses(*n.info);
                 Type retType = type_precision(*n.info);
-                SymboleInfo var = scopeStack.back().contains(n.name) ? scopeStack.back()[n.name] : GlobalSymboleTable[n.name];
+                SymboleInfo var = scopeStack.back().contains(n.name) ? scopeStack.back()[n.name] : globalSymbolTable[n.name];
                 if (retType != var.type) {
                     Type promote = tryPromote(retType, var.type);
                     if (promote == retType) {
@@ -241,6 +252,15 @@ namespace nbuFrontend {
                     print_error("The read function can only take an addresse and not a "+addrType);
                 }
             },
+            [this](EnumAccessNode& n) {
+                std::string name = n.enumName+"::"+n.enumMember;
+                if (!globalEnumRegistry.contains(name)) {
+                    print_error("unknown enum member "+name);
+                }
+            },
+            [this](EnumDeclNode& n) {
+                print_error("Can't declare an enum inside a function"); // will maybe be changed later though probably not
+            },
             [this](asmNode& n) {
                 //do nothing
             },
@@ -257,13 +277,13 @@ namespace nbuFrontend {
         return std::visit(overloads {
             [this](const Int32LiteralNode& n) {return Type{.kind = Type::Kind::INT32};},
             [this](const Float32LiteralNode& n) {return Type{.kind = Type::Kind::FLOAT32};},
-            [this](const VariableAccess& n) {
+            [this](const VariableAccessNode& n) {
                 for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
                     if (it->contains(n.name))
                         return it->at(n.name).type;
                 }
-                if (GlobalSymboleTable.contains(n.name))
-                    return GlobalSymboleTable.at(n.name).type;
+                if (globalSymbolTable.contains(n.name))
+                    return globalSymbolTable.at(n.name).type;
                 return Type{.kind = Type::Kind::INT32};
             },
             [this](const BinaryOpNode& n) {return resolve_type(type_precision(*n.left), type_precision(*n.right));},
@@ -274,6 +294,9 @@ namespace nbuFrontend {
                 if (n.quantity == 32) return Type{.kind = Type::Kind::UINT32};
                 if (n.quantity == 16) return Type{.kind = Type::Kind::UINT32}; // will change
                 else return Type{.kind = Type::Kind::UINT32}; // will change
+            },
+            [this](const EnumAccessNode& n) {
+                return globalEnumRegistry[n.enumName+"::"+n.enumMember].backing_type;
             },
             [this](const auto&) {print_error("Uh?"); return Type{.kind = Type::Kind::INT32};}
         }, node);
@@ -294,12 +317,19 @@ namespace nbuFrontend {
     Type Semantic::tryPromote(const Type currentType, const Type promoteTo) {
         if (resolve_type(currentType, promoteTo) == promoteTo)
             return promoteTo;
-        if (currentType == Type{.kind = Type::Kind::UINT32} && promoteTo == Type{.kind = Type::Kind::INT32}) return promoteTo;
-        if (currentType == Type{.kind = Type::Kind::UINT64} && promoteTo == Type{.kind = Type::Kind::INT64}) return promoteTo;
-        if (currentType == Type{.kind = Type::Kind::INT64} && promoteTo == Type{.kind = Type::Kind::INT32}) return promoteTo;
-        if (currentType == Type{.kind = Type::Kind::UINT64} && promoteTo == Type{.kind = Type::Kind::UINT32}) return promoteTo;
-        if (currentType == Type{.kind = Type::Kind::UINT64} && promoteTo == Type{.kind = Type::Kind::INT32}) return promoteTo;
-        if (currentType == Type{.kind = Type::Kind::INT64} && promoteTo == Type{.kind = Type::Kind::UINT32}) return promoteTo;
+        if (currentType.kind == Type::Kind::INT32 && promoteTo.kind == Type::Kind::INT64) return promoteTo;
+        if (currentType.kind == Type::Kind::UINT32 && promoteTo.kind == Type::Kind::UINT64) return promoteTo;
+        if (currentType.kind == Type::Kind::UINT32 && promoteTo.kind == Type::Kind::INT64) return promoteTo;
+        if (currentType.kind == Type::Kind::UINT32 && promoteTo.kind == Type::Kind::INT32) return promoteTo;
+    if (currentType.kind == Type::Kind::UINT64 && promoteTo.kind == Type::Kind::INT64) return promoteTo;
+        if (promoteTo.kind == Type::Kind::ENUM) {
+            if (currentType.kind == Type::Kind::ENUM && currentType.name == promoteTo.name) {
+                return promoteTo;
+            }
+            if (currentType.kind == Type::Kind::UINT8 || currentType.kind == Type::Kind::UINT16) {
+                return promoteTo; 
+            }
+        }
         return currentType;
     }
 

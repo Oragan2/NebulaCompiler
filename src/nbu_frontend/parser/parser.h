@@ -7,7 +7,6 @@
 #include <vector>
 #include <variant>
 #include <string>
-#include <unordered_map>
 
 namespace nbuFrontend {
     using ASTNode = std::variant<
@@ -15,8 +14,8 @@ namespace nbuFrontend {
         struct Float32LiteralNode,
         struct ReturnStmtNode,
         struct BinaryOpNode,
-        struct VariableDeclare,
-        struct VariableAccess,
+        struct VariableDeclareNode,
+        struct VariableAccessNode,
         struct UnaryOpNode,
         struct IfStmtNode,
         struct BlockStmtNode,
@@ -26,7 +25,9 @@ namespace nbuFrontend {
         struct PromotionNode,
         struct readAddrNode,
         struct writeAddrNode,
-        struct asmNode
+        struct asmNode,
+        struct EnumDeclNode,
+        struct EnumAccessNode
     >;
 
     std::ostream& operator<<(std::ostream& os, const ASTNode&);
@@ -50,13 +51,13 @@ namespace nbuFrontend {
         ASTNode* right;
     };
 
-    struct VariableDeclare {
+    struct VariableDeclareNode {
         std::string name;
         Type type;
         ASTNode* info;
     };
 
-    struct VariableAccess {
+    struct VariableAccessNode {
         std::string name; 
     }; //Temp implementation will be changed later
 
@@ -114,6 +115,16 @@ namespace nbuFrontend {
         std::string rawAsm;
     };
 
+    struct EnumDeclNode {
+        std::string name;
+        std::vector<std::pair<std::string, int>> members;
+    };
+
+    struct EnumAccessNode {
+        std::string enumName;
+        std::string enumMember;
+    };
+
     enum Precedence {
         LOWEST,
         LOGICAL_OR,
@@ -130,8 +141,6 @@ namespace nbuFrontend {
         PREFIX
     };
     
-    extern std::unordered_map<std::string, Type> typeTable;
-
     class Parser {
         public:
         std::vector<ASTNode> parse();
@@ -158,6 +167,8 @@ namespace nbuFrontend {
         ASTNode parse_expression(int precedence);
         ASTNode parse_primary();
         ASTNode parse_asm();
+        ASTNode parse_enum();
+        ASTNode parse_struct();
     };
 }
 

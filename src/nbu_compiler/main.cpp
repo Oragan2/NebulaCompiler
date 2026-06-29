@@ -25,12 +25,12 @@ void print_node(const nbuFrontend::ASTNode& node) {
                 std::cout << "Return ";
                 print_node(*n.expression);
             },
-            [](const nbuFrontend::VariableDeclare& n) {
+            [](const nbuFrontend::VariableDeclareNode& n) {
                 std::cout << "VariableDeclare " << n.name << " " << n.type << " ";
                 if (n.info != nullptr)
                     print_node(*n.info);
             },
-            [](const nbuFrontend::VariableAccess& n) {
+            [](const nbuFrontend::VariableAccessNode& n) {
                 std::cout << "VariableAccess " << n.name;
             },
             [](const nbuFrontend::UnaryOpNode& n) {
@@ -95,6 +95,16 @@ void print_node(const nbuFrontend::ASTNode& node) {
             },
             [](const nbuFrontend::asmNode& n) {
                 std::cout << "asm {" << n.rawAsm << "}";
+            },
+            [](const nbuFrontend::EnumDeclNode& n) {
+                std::cout << "enum " << n.name << "{\n\t";
+                for (const auto&[member,number] : n.members) {
+                    std::cout << member << " = " << number << ",\n\t";
+                }
+                std::cout << "}";
+            },
+            [](const nbuFrontend::EnumAccessNode& n) {
+                std::cout << n.enumName << "::" << n.enumMember;
             }
             }, node);
 }

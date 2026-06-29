@@ -52,6 +52,10 @@ namespace nbuFrontend {
         PADDR, //done
         ASM, // done
         ASM_INSTRUCTIONS, // done
+        ENUM, //done
+        STRUCT, //done
+        DOT, //done
+        DOUBLEDOT, //done
         EOFTOKEN //done
     };
 

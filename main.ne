@@ -7,8 +7,20 @@ int64 test2(uint32 i, int64 v) {
     return i+v;
 }
 
+enum Colors {
+    Red,
+    Green,
+    Blue
+}
+
+enum PageFlags {
+    PRESENT = 1,
+    WRITABLE = 2,
+    USER = 4
+}
+
 int32 main() {
-    int32 a;
+    PageFlags a = PageFlags::PRESENT;
     int32 x = 2*2/3;
     int32 y = x+1;
     int32 z = ~y;

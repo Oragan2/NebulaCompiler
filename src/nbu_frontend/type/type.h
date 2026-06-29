@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <iostream>
+#include <unordered_map>
 #include <vector>
 
 namespace nbuFrontend {
@@ -11,7 +12,10 @@ namespace nbuFrontend {
             FLOAT32, FLOAT64,
             INT32, INT64,
             UINT32, UINT64,
-            VADDR, PADDR
+            INT16, UINT16,
+            INT8, UINT8,
+            VADDR, PADDR,
+            ENUM, STRUCT
         };
         Kind kind;
         std::string name;
@@ -22,6 +26,23 @@ namespace nbuFrontend {
     std::ostream& operator<<(std::ostream& os, Type token); 
     std::string operator+(const std::string& str, Type token);
     std::string type_to_str(Type token);
+
+    struct SymboleInfo {
+        std::string name;
+        Type type;
+        unsigned int stack_offset;
+    };
+
+    struct FunctionInfo {
+        std::string name;
+        Type retType;
+        std::vector<Type> paramType;
+    };
+
+    struct EnumVariantInfo {
+        int raw_value;
+        Type backing_type;
+    };
 
     class ArenaAllocator {
         public:
@@ -53,6 +74,7 @@ namespace nbuFrontend {
     };
 
     extern ArenaAllocator arena;
+    extern std::unordered_map<std::string, Type> typeTable;
 }
 
 #endif

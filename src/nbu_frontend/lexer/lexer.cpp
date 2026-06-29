@@ -24,7 +24,8 @@ namespace nbuFrontend {
       {')', TokenType::RPARAM},
       {'{', TokenType::LBRAK},
       {'}', TokenType::RBRAK},
-      {',', TokenType::COMMA}
+      {',', TokenType::COMMA},
+      {'.', TokenType::DOT}
   };
 
   std::unordered_map<std::string, TokenType> KeywordMap{
@@ -48,7 +49,10 @@ namespace nbuFrontend {
       {"uint64", TokenType::UINT64},
       {"vaddr", TokenType::VADDR},
       {"paddr", TokenType::PADDR},
-      {"asm", TokenType::ASM}
+      {"asm", TokenType::ASM},
+      {"enum", TokenType::ENUM},
+      {"struct", TokenType::STRUCT},
+      {"::", TokenType::DOUBLEDOT}
   };
 
   std::ostream &operator<<(std::ostream &os, TokenType token) {
@@ -152,6 +156,14 @@ namespace nbuFrontend {
       return "asm";
     case TokenType::ASM_INSTRUCTIONS:
       return "asm instructions";
+    case TokenType::ENUM:
+      return "enum";
+    case TokenType::STRUCT:
+      return "struct";
+    case TokenType::DOT:
+      return ".";
+    case TokenType::DOUBLEDOT:
+      return "::";
     default:
       return "TODO";
     }
@@ -235,6 +247,21 @@ namespace nbuFrontend {
       case State::TEXT:
         if (std::isalnum(c))
           word += c;
+        else if (c == ':') {
+          char next_c = file.get();
+          if (c == next_c) {
+            flush_token();
+            tokens.emplace_back(TokenType::DOUBLEDOT, "::",column, line);
+            if (SymboleTable.find(c) != SymboleTable.end())
+              handle_symbole();
+            else if (!std::isspace(c)) {
+              state = std::isdigit(c) ? State::NUMBER : State::TEXT;
+            }
+          }
+          else {
+            file.unget();
+          }
+        }
         else if (word == "asm") {
           tokens.emplace_back(TokenType::ASM, word, column, line);
           column += 3;

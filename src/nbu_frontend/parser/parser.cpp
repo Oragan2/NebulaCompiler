@@ -44,8 +44,8 @@ namespace nbuFrontend {
             [&](const Float32LiteralNode& n) {os << "float32";},
             [&](const ReturnStmtNode& n) {os << "return";},
             [&](const BinaryOpNode& n) {os << "binaryOp";},
-            [&](const VariableDeclare& n) {os << "varDecl";},
-            [&](const VariableAccess& n) {os << "varAcc";},
+            [&](const VariableDeclareNode& n) {os << "varDecl";},
+            [&](const VariableAccessNode& n) {os << "varAcc";},
             [&](const UnaryOpNode& n) {os << "unaryOp";},
             [&](const IfStmtNode& n) {os << "if";},
             [&](const BlockStmtNode& n) {os << "block";},
@@ -55,7 +55,9 @@ namespace nbuFrontend {
             [&](const PromotionNode& n) {os << "Promot";},
             [&](const readAddrNode& n) {os << "read";},
             [&](const writeAddrNode& n) {os << "write";},
-            [&](const asmNode& n) {os << "asm";}
+            [&](const asmNode& n) {os << "asm";},
+            [&](const EnumDeclNode& n) {os << "enum";},
+            [&](const EnumAccessNode& n) {os << "enumAcc";}
         },node);
         return os;
     }
@@ -186,7 +188,7 @@ namespace nbuFrontend {
     }
 
     ASTNode Parser::parse_variable_sentence() {
-        VariableDeclare ret = (VariableDeclare){.type = typeTable[peek().val]};
+        VariableDeclareNode ret = (VariableDeclareNode){.type = typeTable[peek().val]};
         consume(peek().type);
         std::string name = peek().val; 
         ret.name = name;
@@ -234,8 +236,14 @@ namespace nbuFrontend {
                 consume(TokenType::LPARAM);
                 return parse_function_call(name);
             }
+            else if (TokenType::DOUBLEDOT == peek().type) {
+                consume(TokenType::DOUBLEDOT);
+                std::string memName = peek().val;
+                consume(TokenType::IDENTIFIER);
+                return EnumAccessNode{.enumName = name, .enumMember = memName};
+            }
             else 
-                return VariableAccess{.name = name};
+                return VariableAccessNode{.name = name};
         }
         else {
             if (peek().type == TokenType::INT_SIGNED_32)
@@ -311,7 +319,6 @@ namespace nbuFrontend {
 
             left = BinaryOpNode{.op = op.type,.precision=Type{Type::Kind::INT32},.left = arena.allocate<ASTNode>(left),.right = arena.allocate<ASTNode>(right)};
         }
-
         return left;
     }
 
@@ -319,18 +326,21 @@ namespace nbuFrontend {
         std::vector<ASTNode> astnodes;
         Token token = peek();
         while (token.type != TokenType::EOFTOKEN) {
-            if (typeTable.find(peek().val) == typeTable.end()) { // support variable & function declarations
+            if (token.type == TokenType::ENUM) {
+                astnodes.push_back(parse_enum());
+            }
+            else if (typeTable.find(peek().val) == typeTable.end()) { // support variable & function declarations
                 print_error("Only variables or functions can be declared at file root level");
             }
             else {
-            std::string type = peek().val;
-            consume(peek().type);
-            std::string name = peek().val;
-            consume(TokenType::IDENTIFIER);
-            if (peek().type == TokenType::LPARAM)
-                astnodes.push_back(parse_function(name, typeTable[type]));
-            else
-                astnodes.push_back(parse_variable_sentence(name, typeTable[type]));
+                std::string type = peek().val;
+                consume(peek().type);
+                std::string name = peek().val;
+                consume(TokenType::IDENTIFIER);
+                if (peek().type == TokenType::LPARAM)
+                    astnodes.push_back(parse_function(name, typeTable[type]));
+                else
+                    astnodes.push_back(parse_variable_sentence(name, typeTable[type]));
             }
             token = peek();
         }
@@ -340,16 +350,16 @@ namespace nbuFrontend {
     ASTNode Parser::parse_variable_sentence(const std::string& name, Type type) {
         if (peek().type != TokenType::EQUAL) {
             consume(TokenType::SEMICOLON);
-            return VariableDeclare{ .name = name, .type = type, .info = nullptr};
+            return VariableDeclareNode{ .name = name, .type = type, .info = nullptr};
         }
         consume(TokenType::EQUAL);
         ASTNode info = parse_expression(Precedence::LOWEST);
         consume(TokenType::SEMICOLON);
-        return VariableDeclare{.name = name, .type = type, .info = arena.allocate<ASTNode>(info)};
+        return VariableDeclareNode{.name = name, .type = type, .info = arena.allocate<ASTNode>(info)};
     }
 
     ASTNode Parser::parse_parameter() {
-        VariableDeclare ret;
+        VariableDeclareNode ret;
         if (!typeTable.contains(peek().val)) {
             print_error("Unknown type : "+peek().val);
         }
@@ -386,6 +396,31 @@ namespace nbuFrontend {
         else 
             ret.code = arena.allocate<ASTNode>(parse_sentence());
         return ret; 
+    }
+
+    ASTNode Parser::parse_enum() {
+        consume(TokenType::ENUM);
+        std::string name = peek().val;
+        consume(TokenType::IDENTIFIER);
+        consume(TokenType::LBRAK);
+        int i = 0;
+        EnumDeclNode ret;
+        ret.name = name;
+        while (peek().type != TokenType::RBRAK) {
+            std::string memName = peek().val;
+            consume(TokenType::IDENTIFIER);
+            if (peek().type == TokenType::EQUAL) {
+                consume(TokenType::EQUAL);
+                i = std::stoi(peek().val);
+                consume(TokenType::INT_SIGNED_32);  
+            } 
+            ret.members.emplace_back(memName,i++);
+            if (peek().type != TokenType::RBRAK) 
+                consume(TokenType::COMMA);
+        }
+        typeTable.emplace(name, Type{.kind = Type::Kind::ENUM, .name = name});
+        consume(TokenType::RBRAK);
+        return ret;
     }
 
     [[noreturn]] void Parser::print_error(const std::string& msg) {
