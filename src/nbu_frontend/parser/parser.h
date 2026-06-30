@@ -1,8 +1,8 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "lexer.h"
-#include "type.h"
+#include "../lexer/lexer.h"
+#include "../type/type.h"
 #include <ostream>
 #include <vector>
 #include <variant>

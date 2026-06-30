@@ -1,6 +1,7 @@
-#include "../nbu_frontend/parser/parser.h"
-#include "../nbu_frontend/lexer/lexer.h"
-#include "semantic.h"
+#include "../../nbu_frontend/parser/parser.h"
+#include "../../nbu_frontend/lexer/lexer.h"
+#include "../../nbu_frontend/semanticAnalyser/semantic.h"
+#include "../../nbu_backend/codeGen/codegen.h"
 #include <cstdlib>
 #include <vector>
 #include <variant>
@@ -150,12 +151,12 @@ int main(int argc, char **argv) {
 
   std::cout << "The analyses ended with " << errors << " errors and " << warnings << " warnings" << std::endl;
 
-  if (errors == 0)
-    print_tree(semantic.getNodes());
-  else {
+  if (errors != 0) {
     std::cerr << "Fix errors before recompilling" << std::endl;
     return EXIT_FAILURE;
   }
+
+  print_tree(semantic.getNodes());
 
   return EXIT_SUCCESS;
 }
