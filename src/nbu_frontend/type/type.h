@@ -17,7 +17,8 @@ namespace nbuFrontend {
             INT16, UINT16,
             INT8, UINT8,
             VADDR, PADDR,
-            ENUM, STRUCT
+            ENUM, STRUCT,
+            VOID
         };
         Kind kind;
         std::string name;

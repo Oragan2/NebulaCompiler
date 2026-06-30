@@ -2,6 +2,7 @@
 #include "type.h"
 #include "lexer.h"
 #include "parser.h"
+#include <cstddef>
 #include <unordered_set>
 #include <utility>
 #include <variant>
@@ -71,6 +72,10 @@ namespace nbuFrontend {
                     functions.emplace(currentFunc.name, currentFunc);
                     if (n.code != nullptr)
                         codeSemanticAnalyses(*n.code);
+                    bool hasreturn = hasReturn(*n.code);
+                    if (n.retType != typeTable["void"] && !hasreturn) {
+                        print_error("Function supposed to return a "+n.retType+" but doesn't return anything");
+                    }
                     scopeStack.pop_back();
                 },
                 [this](const EnumDeclNode& n) {
@@ -99,6 +104,29 @@ namespace nbuFrontend {
         }
 
         return {errorNumber, warningNumber};
+    }
+
+    bool Semantic::hasReturn(const ASTNode& n) {
+        return std::visit(overloads{
+            [this](const ReturnStmtNode& n) {
+                return true;
+            },
+            [this](const BlockStmtNode& n) {
+                for (const auto& node : n.codes) {
+                    if (hasReturn(*node)) return true;
+                }
+                return false;
+            },
+            [this](const IfStmtNode& n) {
+                if (hasReturn(*n.ifNode)) {
+                    if (n.elseNode != nullptr && hasReturn(*n.elseNode)) return true;
+                }
+                return false;
+            },
+            [this](const auto& n) {
+                return false;
+            }
+        },n);
     }
 
     void Semantic::codeSemanticAnalyses(ASTNode& node) {

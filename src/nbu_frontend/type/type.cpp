@@ -6,6 +6,19 @@
 namespace nbuFrontend {
     ArenaAllocator arena(4*1024*1204);
 
+    
+    std::unordered_map<std::string, Type> typeTable {
+        {"int32", Type{Type::Kind::INT32}},
+        {"uint32", Type{Type::Kind::UINT32}},
+        {"int64", Type{Type::Kind::INT64}},
+        {"uint64", Type{Type::Kind::UINT64}},
+        {"float32", Type{Type::Kind::FLOAT32}},
+        {"float64", Type{Type::Kind::FLOAT64}},
+        {"vaddr", Type{Type::Kind::VADDR}},
+        {"paddr", Type{Type::Kind::PADDR}},
+        {"void", Type{Type::Kind::VOID}}
+    };
+
     bool Type::operator!=(const Type& other) const {
         return kind != other.kind;
     }
@@ -44,6 +57,8 @@ namespace nbuFrontend {
                 return "enum "+type.name;
             case Type::Kind::STRUCT:
                 return "struct "+type.name;
+            case Type::Kind::VOID:
+                return "void";
             default:
                 return "Unknown Type";
         }

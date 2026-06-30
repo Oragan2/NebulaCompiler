@@ -52,7 +52,8 @@ namespace nbuFrontend {
       {"asm", TokenType::ASM},
       {"enum", TokenType::ENUM},
       {"struct", TokenType::STRUCT},
-      {"::", TokenType::DOUBLEDOT}
+      {"::", TokenType::DOUBLEDOT},
+      {"void", TokenType::VOID}
   };
 
   std::ostream &operator<<(std::ostream &os, TokenType token) {
@@ -164,6 +165,8 @@ namespace nbuFrontend {
       return ".";
     case TokenType::DOUBLEDOT:
       return "::";
+    case TokenType::VOID:
+      return "void";
     default:
       return "TODO";
     }

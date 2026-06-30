@@ -15,17 +15,6 @@ template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 namespace nbuFrontend {
     Parser::Parser(const std::vector<Token>& tokens) : tokens{tokens}, cursor{0} {}
 
-    std::unordered_map<std::string, Type> typeTable {
-        {"int32", Type{Type::Kind::INT32}},
-        {"uint32", Type{Type::Kind::UINT32}},
-        {"int64", Type{Type::Kind::INT64}},
-        {"uint64", Type{Type::Kind::UINT64}},
-        {"float32", Type{Type::Kind::FLOAT32}},
-        {"float64", Type{Type::Kind::FLOAT64}},
-        {"vaddr", Type{Type::Kind::VADDR}},
-        {"paddr", Type{Type::Kind::PADDR}}
-    };
-
     std::unordered_set<std::string> readWriteNameTable {
         "read8",
         "read16",

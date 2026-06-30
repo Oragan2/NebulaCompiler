@@ -56,6 +56,7 @@ namespace nbuFrontend {
         STRUCT, //done
         DOT, //done
         DOUBLEDOT, //done
+        VOID, //done
         EOFTOKEN //done
     };
 

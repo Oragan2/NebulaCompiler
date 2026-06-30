@@ -33,6 +33,7 @@ namespace nbuFrontend {
         Type resolve_type(Type left, Type right);
         SymboleInfo resolveVariable(const ASTNode& n);
         Type tryPromote(Type currentType, Type promoteTo);
+        bool hasReturn(const ASTNode& n);
         void print_error(const std::string& msg);
         void print_warning(const std::string& msg);
     };
