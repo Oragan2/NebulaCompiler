@@ -59,8 +59,7 @@ namespace nbuFrontend {
             [&](const EnumDeclNode& n) {os << "enum";},
             [&](const EnumAccessNode& n) {os << "enumAcc";},
             [&](const StructDeclNode& n) {os << "struct";},
-            [&](const StructAccessNode& n) {os << "structAcc";},
-            [&](const StructModNode& n) {os << "structMod";}
+            [&](const StructAccessNode& n) {os << "structAcc";}
         },node);
         return os;
     }
@@ -114,14 +113,14 @@ namespace nbuFrontend {
     }
 
     ASTNode Parser::parse_identifier_sentence() {
-        std::string name = peek().val;
-        consume(TokenType::IDENTIFIER);
-        if (readWriteNameTable.contains(name)) {
+        Token info = peek();
+        if (readWriteNameTable.contains(info.val)) {
+            consume(TokenType::IDENTIFIER);
             consume(TokenType::LPARAM);
             ASTNode addr = parse_expression(Precedence::LOWEST);
-            if (name.find("read") != std::string::npos) {
+            if (info.val.find("read") != std::string::npos) {
                 readAddrNode ret;
-                ret.quantity = std::stoi(name.data()+4);
+                ret.quantity = std::stoi(info.val.data()+4);
                 ret.addr = arena.allocate<ASTNode>(addr);
                 consume(TokenType::RPARAM);
                 consume(TokenType::SEMICOLON);
@@ -129,7 +128,7 @@ namespace nbuFrontend {
             }
             else {
                 writeAddrNode ret;
-                ret.quantity = std::stoi(name.data()+5);
+                ret.quantity = std::stoi(info.val.data()+5);
                 ret.addr = arena.allocate<ASTNode>(addr);
                 consume(TokenType::COMMA);
                 ret.value = arena.allocate<ASTNode>(parse_expression(Precedence::LOWEST));
@@ -138,39 +137,24 @@ namespace nbuFrontend {
                 return ret;
             }
         }
-        if (TokenType::LPARAM == peek().type) {
+        if (TokenType::LPARAM == tokens[cursor+1].type) {
+            consume(TokenType::IDENTIFIER);
             consume(TokenType::LPARAM);
-            ASTNode ret = parse_function_call(name);
+            ASTNode ret = parse_function_call(info.val);
             consume(TokenType::SEMICOLON);
             return ret;
         }
-        if (peek().type == TokenType::EQUAL) {
-            consume(TokenType::EQUAL);
+        if (tokens[cursor+1].type == TokenType::EQUAL || tokens[cursor+1].type == TokenType::DOT) {
             VariableModNode ret;
-            ret.name = name;
+            ret.variable = arena.allocate<ASTNode>(parse_primary());
+            consume(TokenType::EQUAL);
             ASTNode expr = parse_expression(Precedence::LOWEST);
             ret.info = arena.allocate<ASTNode>(expr);
             consume(TokenType::SEMICOLON);
             return ret;
         }
-        if (peek().type == TokenType::DOT) {
-            consume(TokenType::DOT);
-            StructModNode ret;
-            ret.structName = name;
-            ret.fieldName = peek().val;
-            consume(TokenType::IDENTIFIER);
-            if (peek().type == TokenType::EQUAL) {
-                consume(TokenType::EQUAL);
-                VariableModNode ret;
-                ret.name = name;
-                ASTNode expr = parse_expression(Precedence::LOWEST);
-                ret.info = arena.allocate<ASTNode>(expr);
-                consume(TokenType::SEMICOLON);
-            } 
-            return ret;
-        }
         else 
-            print_error("Unknown identifer: " + name);
+            print_error("Unknown identifer: " + info.val);
     }
 
     ASTNode Parser::parse_if_sentence() {
@@ -250,25 +234,26 @@ namespace nbuFrontend {
         }
         else if (TokenType::IDENTIFIER == peek().type) {
             const std::string& name = peek().val;
+            ASTNode ret;
             consume(TokenType::IDENTIFIER);
             if (TokenType::LPARAM == peek().type) {
                 consume(TokenType::LPARAM);
-                return parse_function_call(name);
+                ret = parse_function_call(name);
             }
             else if (TokenType::DOUBLEDOT == peek().type) {
                 consume(TokenType::DOUBLEDOT);
                 std::string memName = peek().val;
                 consume(TokenType::IDENTIFIER);
-                return EnumAccessNode{.enumName = name, .enumMember = memName};
+                ret = EnumAccessNode{.enumName = name, .enumMember = memName};
             }
-            else if (TokenType::DOT == peek().type) {
+            else ret = VariableAccessNode{name};
+            while (TokenType::DOT == peek().type) {
                 consume(TokenType::DOT);
                 std::string fieldName = peek().val;
                 consume(TokenType::IDENTIFIER);
-                return StructAccessNode{name, fieldName};
+                ret = StructAccessNode{arena.allocate<ASTNode>(ret), fieldName};
             }
-            else 
-                return VariableAccessNode{.name = name};
+            return ret;
         }
         else {
             if (peek().type == TokenType::INT_SIGNED_32)

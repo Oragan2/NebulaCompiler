@@ -76,7 +76,9 @@ void print_node(const nbuFrontend::ASTNode& node) {
                 std::cout << ")";
             },
             [](const nbuFrontend::VariableModNode& n) {
-                std::cout << "VariableModification " << n.name << " ";
+                std::cout << "VariableModification ";
+                print_node(*n.variable);
+                std::cout << " ";
                 print_node(*n.info);
             },
             [](const nbuFrontend::PromotionNode& n) {
@@ -115,11 +117,9 @@ void print_node(const nbuFrontend::ASTNode& node) {
                 std::cout << "}";
             },
             [](const nbuFrontend::StructAccessNode& n) {
-                std::cout << n.structName << "." << n.fieldName;
-            },
-            [](const nbuFrontend::StructModNode& n) {
-                std::cout << n.structName << "." << n.fieldName << " = ";
-                print_node(*n.info);
+                std::cout << "StructAccess ";
+                print_node(*n.firstPart);
+                std::cout << " field " << n.fieldName;
             }
             }, node);
 }

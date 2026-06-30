@@ -29,8 +29,7 @@ namespace nbuFrontend {
         struct EnumDeclNode,
         struct EnumAccessNode,
         struct StructDeclNode,
-        struct StructAccessNode,
-        struct StructModNode
+        struct StructAccessNode
     >;
 
     std::ostream& operator<<(std::ostream& os, const ASTNode&);
@@ -93,7 +92,7 @@ namespace nbuFrontend {
     };
 
     struct VariableModNode {
-        std::string name;
+        ASTNode* variable;
         ASTNode* info;
     };
 
@@ -134,14 +133,8 @@ namespace nbuFrontend {
     };
     
     struct StructAccessNode {
-        std::string structName;
+        ASTNode* firstPart;
         std::string fieldName;
-    };
-
-    struct StructModNode {
-        std::string structName;
-        std::string fieldName;
-        ASTNode* info;
     };
 
     enum Precedence {

@@ -52,7 +52,7 @@ namespace nbuFrontend {
                         std::visit(overloads {
                             [this](VariableDeclareNode& n) {
                                 currentFunc.paramType.emplace_back(n.type);
-                                scopeStack.back().emplace(n.name, SymboleInfo{n.name, n.type, 0});
+                                scopeStack.back().emplace(n.name, SymboleInfo{n.type, 0});
                                 if (n.info != nullptr) {
                                     codeSemanticAnalyses(*n.info);
                                     Type retType = type_precision(*n.info);
@@ -145,7 +145,7 @@ namespace nbuFrontend {
                 if (scopeStack.back().contains(n.name)) {
                     print_error("Variable "+n.name+" was already declared somewhere else");
                 }
-                scopeStack.back().emplace(n.name, SymboleInfo{n.name, n.type, 0});
+                scopeStack.back().emplace(n.name, SymboleInfo{n.type, 0});
                 if (n.info != nullptr) {
                     codeSemanticAnalyses(*n.info);
                     Type retType = type_precision(*n.info);
@@ -226,17 +226,10 @@ namespace nbuFrontend {
                 }
             },
             [this](VariableModNode& n) {
-                bool found = 0;
-                for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it)
-                    if (it->contains(n.name))
-                        found = 1;
-                if (globalSymbolTable.contains(n.name)) found = 1;
-                if (!found) {
-                    print_error("The variable "+n.name+" doesn't exist");
-                }
+                codeSemanticAnalyses(*n.variable);
                 codeSemanticAnalyses(*n.info);
                 Type retType = type_precision(*n.info);
-                SymboleInfo var = scopeStack.back().contains(n.name) ? scopeStack.back()[n.name] : globalSymbolTable[n.name]; // will redo the logic later
+                SymboleInfo var = resolveVariable(*n.variable);
                 if (retType != var.type) {
                     Type promote = tryPromote(retType, var.type);
                     if (promote == retType) {
@@ -267,59 +260,8 @@ namespace nbuFrontend {
                 }
             },
             [this](StructAccessNode& n) {
-                char found = 0;
                 SymboleInfo vInfo;
-                for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
-                    if (it->contains(n.structName) || globalSymbolTable.contains(n.structName)) {
-                        found = 1;
-                        if (it->contains(n.structName))
-                            vInfo = it->at(n.structName);
-                        else
-                            vInfo = globalSymbolTable[n.structName];
-                    }
-                }
-                if (!found) {
-                    print_error("Unknown variable");
-                }
-                if (!globalStructRegistery.contains(vInfo.type.name)) {
-                    print_error("A "+vInfo.type+" cannot have fields");
-                }
-                StructTypeInfo sInfo;
-                if (!sInfo.fields.contains(n.fieldName)) {
-                    print_error("The struct "+vInfo.type+" does't have "+n.fieldName+" as a field");
-                }
-            },
-            [this](StructModNode& n) {
-                char found = 0;
-                SymboleInfo vInfo;
-                for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
-                    if (it->contains(n.structName) || globalSymbolTable.contains(n.structName)) {
-                        found = 1;
-                        if (it->contains(n.structName))
-                            vInfo = it->at(n.structName);
-                        else
-                            vInfo = globalSymbolTable[n.structName];
-                    }
-                }
-                if (!found) {
-                    print_error("Unknown variable");
-                }
-                if (!globalStructRegistery.contains(vInfo.type.name)) {
-                    print_error("A "+vInfo.type+" cannot have fields");
-                }
-                StructTypeInfo sInfo;
-                if (!sInfo.fields.contains(n.fieldName)) {
-                    print_error("The struct "+vInfo.type+" does't have "+n.fieldName+" as a field");
-                }
-                codeSemanticAnalyses(*n.info);
-                Type retType = type_precision(*n.info);
-                if (retType != vInfo.type) {
-                    Type promote = tryPromote(retType, vInfo.type);
-                    if (promote == retType) {
-                        print_error("The variable is a "+vInfo.type+" but tryed to asigne a "+promote+" to it");
-                    }
-                    n.info = arena.allocate<ASTNode>(PromotionNode{promote, retType, n.info});
-                }
+                codeSemanticAnalyses(*n.firstPart);
             },
             [this](StructDeclNode& n) {
                 print_error("Can't declare an enum inside a function"); // will maybe be changed later though probably not
@@ -337,6 +279,38 @@ namespace nbuFrontend {
                 print_error("Function declaration impossible inside another function");
             }
         }, node);
+    }
+
+    SymboleInfo Semantic::resolveVariable(const ASTNode& n) {
+        return std::visit(overloads {
+            [&](const VariableAccessNode& n) {
+                bool found = false;
+                for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
+                    if (it->contains(n.name))
+                        return it->at(n.name);
+                if (globalSymbolTable.contains(n.name))
+                    return globalSymbolTable[n.name];
+                }
+                return SymboleInfo{Type{Type::Kind::INT32}, 0};
+            },
+            [&](const StructAccessNode& n) {
+                SymboleInfo base = resolveVariable(*n.firstPart);
+
+                StructTypeInfo& info = globalStructRegistery.at(base.type.name);
+
+                auto& field = info.fields.at(n.fieldName);
+
+                return SymboleInfo{
+                    field.kind,
+                    field.name,
+                    0
+                };
+            },
+            [&](const auto&) {
+                print_error("Expression is not assignable");
+                return SymboleInfo{Type{Type::Kind::INT32}, 0};
+            }
+        }, n);
     }
 
     Type Semantic::type_precision(const ASTNode& node) {

@@ -30,9 +30,8 @@ namespace nbuFrontend {
     std::string type_to_str(Type token);
 
     struct SymboleInfo {
-        std::string name;
         Type type;
-        unsigned int stack_offset;
+        unsigned stack_offset;
     };
 
     struct FunctionInfo {
@@ -48,11 +47,6 @@ namespace nbuFrontend {
 
     struct StructTypeInfo {
         std::unordered_map<std::string, Type> fields;
-    };
-
-    struct StructVariantInfo {
-        int offset;
-        Type type;
     };
 
     class ArenaAllocator {
