@@ -32,6 +32,24 @@ namespace nbuFrontend {
     std::pair<int, int> Semantic::semanticAnalyses() {
         for (ASTNode& node : nodes) {
             std::visit(overloads {
+                [this](FuncStmtNode& n) {
+                    currentFunc = FunctionInfo{.name = n.name, .retType = n.retType};
+                    for (ASTNode*& parameterNode : n.parameters) {
+                        std::visit(overloads {
+                            [this](VariableDeclareNode& n) {
+                                currentFunc.paramType.emplace_back(n.type);
+                            },
+                            [this](auto& n) {print_error("only variable declaration can be done in the function declaration"); }
+                        },*parameterNode);
+                    }
+                    functions.emplace(currentFunc.name, currentFunc);                    
+                },
+                [this](auto& n) {}
+            }, node);
+        }
+
+        for (ASTNode& node : nodes) {
+            std::visit(overloads {
                 [this](VariableDeclareNode& n) {
                     globalSymbolTable.emplace(n.name, SymboleInfo{.type = n.type, .stack_offset = 0});
                     if (n.info != nullptr) {
@@ -47,12 +65,11 @@ namespace nbuFrontend {
                     }
                 },
                 [this](FuncStmtNode& n) {
-                    currentFunc = FunctionInfo{.name = n.name, .retType = n.retType};
+                    currentFunc = functions[n.name];
                     scopeStack.push_back({});
                     for (ASTNode*& parameterNode : n.parameters) {
                         std::visit(overloads {
                             [this](VariableDeclareNode& n) {
-                                currentFunc.paramType.emplace_back(n.type);
                                 scopeStack.back().emplace(n.name, SymboleInfo{n.type, 0});
                                 if (n.info != nullptr) {
                                     codeSemanticAnalyses(*n.info);
@@ -69,7 +86,6 @@ namespace nbuFrontend {
                             [this](auto& n) {print_error("only variable declaration can be done in the function declaration"); }
                         },*parameterNode);
                     }
-                    functions.emplace(currentFunc.name, currentFunc);
                     if (n.code != nullptr)
                         codeSemanticAnalyses(*n.code);
                     bool hasreturn = hasReturn(*n.code);
@@ -238,8 +254,7 @@ namespace nbuFrontend {
             },
             [this](FuncCallStmtNode& n) {
                 if (!functions.contains(n.name)) {
-                    unknownFunctionName.push_back(n.name);
-                    return;
+                    print_error("Function "+n.name+" unknown");
                 }
                 FunctionInfo func = functions[n.name];
                 if (n.callParameters.size() != func.paramType.size()) {

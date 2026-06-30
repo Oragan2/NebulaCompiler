@@ -26,6 +26,7 @@ struct TaskState {
 }
 
 int32 main() {
+    test3();
     PageFlags a = PageFlags::PRESENT;
     TaskState b;
     b.back_link = 12;
@@ -49,3 +50,4 @@ int32 main() {
     return z+y;
 }
 
+void test3() {}
