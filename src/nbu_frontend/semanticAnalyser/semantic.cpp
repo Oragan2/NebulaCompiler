@@ -192,9 +192,14 @@ namespace nbuFrontend {
                     }
                     n.condition = arena.allocate<ASTNode>(PromotionNode{promote, condType, n.condition});
                 }
+                scopeStack.push_back({});
                 codeSemanticAnalyses(*n.ifNode);
-                if (n.elseNode != nullptr)
+                scopeStack.pop_back();
+                if (n.elseNode != nullptr) {
+                    scopeStack.push_back({});
                     codeSemanticAnalyses(*n.elseNode);
+                    scopeStack.pop_back();
+                }
             },
             [this](BlockStmtNode& n) {
                 scopeStack.push_back({});
