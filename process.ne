@@ -13,7 +13,13 @@ struct Process {
     State state
 }
 
+struct CPUCore {
+    uint16 coreNumber,
+    Process currentProcess
+}
+
 uint32 LPID = 0;
+CPUCore core1;
 
 void newProcess(vaddr func) {
     Process p;

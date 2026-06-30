@@ -15,7 +15,9 @@ namespace nbuFrontend {
         Semantic(std::vector<ASTNode>& nodes);
         std::pair<int, int> semanticAnalyses();
         std::vector<ASTNode>& getNodes();
-
+        std::unordered_map<std::string, EnumVariantInfo>& getEnums() {return globalEnumRegistry;}
+        std::unordered_map<std::string, StructTypeInfo>& getStruct() {return globalStructRegistery;}
+        
         private:
         std::vector<ASTNode>& nodes;
         std::unordered_map<std::string, FunctionInfo> functions;

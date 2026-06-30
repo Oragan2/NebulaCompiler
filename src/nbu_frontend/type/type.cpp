@@ -2,6 +2,8 @@
 #include <cstddef>
 #include <iostream>
 #include <stdexcept>
+#include <string>
+#include <unordered_map>
 
 namespace nbuFrontend {
     ArenaAllocator arena(4*1024*1204);
@@ -12,11 +14,32 @@ namespace nbuFrontend {
         {"uint32", Type{Type::Kind::UINT32}},
         {"int64", Type{Type::Kind::INT64}},
         {"uint64", Type{Type::Kind::UINT64}},
+        {"int16", Type{Type::Kind::INT16}},
+        {"uint16", Type{Type::Kind::UINT16}},
+        {"int8", Type{Type::Kind::INT8}},
+        {"uint8", Type{Type::Kind::UINT8}},
         {"float32", Type{Type::Kind::FLOAT32}},
         {"float64", Type{Type::Kind::FLOAT64}},
         {"vaddr", Type{Type::Kind::VADDR}},
         {"paddr", Type{Type::Kind::PADDR}},
         {"void", Type{Type::Kind::VOID}}
+    };
+
+    std::unordered_map<Type::Kind, char> typeSize {
+        {Type::Kind::INT32, 4},
+        {Type::Kind::UINT32, 4},
+        {Type::Kind::INT64, 8},
+        {Type::Kind::UINT64, 8},
+        {Type::Kind::INT16, 2},
+        {Type::Kind::UINT16, 2},
+        {Type::Kind::INT8, 1},
+        {Type::Kind::UINT8, 1},
+        {Type::Kind::FLOAT32, 4},
+        {Type::Kind::FLOAT64, 8},
+        {Type::Kind::VADDR, 8},
+        {Type::Kind::PADDR, 8},
+        {Type::Kind::VOID, -1},
+        {Type::Kind::ENUM, -2},
     };
 
     bool Type::operator!=(const Type& other) const {

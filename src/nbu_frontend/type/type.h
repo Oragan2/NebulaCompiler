@@ -81,6 +81,7 @@ namespace nbuFrontend {
 
     extern ArenaAllocator arena;
     extern std::unordered_map<std::string, Type> typeTable;
+    extern std::unordered_map<Type::Kind, char> typeSize;
 }
 
 #endif

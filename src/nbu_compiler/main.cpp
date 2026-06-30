@@ -3,6 +3,7 @@
 #include "../../nbu_frontend/semanticAnalyser/semantic.h"
 #include "../../nbu_backend/codeGen/codegen.h"
 #include <cstdlib>
+#include <fstream>
 #include <vector>
 #include <variant>
 #include <iostream>
@@ -157,6 +158,12 @@ int main(int argc, char **argv) {
   }
 
   print_tree(semantic.getNodes());
+
+  std::ofstream outputFile("a.out");
+
+  nbuBackend::CodeGen codegen{semantic.getNodes(),outputFile,semantic.getStruct(),semantic.getEnums()};
+
+  codegen.generate();
 
   return EXIT_SUCCESS;
 }
