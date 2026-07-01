@@ -32,7 +32,7 @@ int32 main() {
     b.back_link = 12;
     int32 x = 2*2/3;
     int32 y = x+1;
-    int32 z = ~y;
+    int32 z = 2;
     x = test(x);
     if (x == y)
         int32 tmp = 1;

@@ -1,9 +1,9 @@
 #include "codegen.h"
 #include "../../nbu_frontend/parser/parser.h"
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <cstdio>
 
 template<class... Ts> struct overloads : Ts... { using Ts::operator()...; };
 template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
@@ -12,86 +12,156 @@ template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 namespace nbuBackend {
     CodeGen::CodeGen(std::vector<nbuFrontend::ASTNode>& nodes, std::ofstream& file, std::unordered_map<std::string, nbuFrontend::StructTypeInfo>& structs, std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums) : nodes{nodes}, file{file}, structs{structs}, enums{enums} {}
     void CodeGen::generate() {
-        std::ofstream data_file("output.data.tmp");
-        std::ofstream bss_file("output.bss.tmp");
-        std::ofstream text_file("output.text.tmp");
+        std::stringstream data;
+        std::stringstream bss;
+        std::stringstream text;
 
-        data_file << "section .data\n";
-        bss_file << "section .bss\n";
-        text_file << "section .text\n";
+        data << "section .data\n";
+        bss << "section .bss\n";
+        text << "section .text\n";
 
         for (const auto& node : nodes) {
             std::visit(overloads {
                 [&](const nbuFrontend::VariableDeclareNode& n) {
                     if (n.type.kind != nbuFrontend::Type::Kind::STRUCT) {
-                        data_file << "\t" + n.name + ": d";
+                        data << "\t" + n.name + ": d";
                         switch(nbuFrontend::typeSize[n.type.kind]) {
                             case 1:
-                                data_file << "b ";
+                                data << "b ";
                                 break;
                             case 2:
-                                data_file << "w ";
+                                data << "w ";
                                 break;
                             case 4:
-                                data_file << "d ";
+                                data << "d ";
                                 break;
                             case 8:
-                                data_file << "q ";
+                                data << "q ";
                                 break;
                         }
                         if (n.info == nullptr)
-                            data_file << "0\n";
+                            data << "0\n";
                         else {
-                            data_file << std::visit(overloads {
+                            data << std::visit(overloads {
                                 [](const nbuFrontend::Int32LiteralNode& n) {
                                     return std::to_string(n.value);
                                 },
                                 [](const nbuFrontend::Float32LiteralNode& n) {
-                                    std::cout << n.value << std::endl;
                                     return std::to_string(n.value);
                                 },
                                 [](const auto&) {
                                     return std::string{"0"};
                                 }
                             }, *n.info);
-                            data_file << "\n";
+                            data << "\n";
                         }
                     }
                     else {
-                        bss_file << "\t" << n.name << ": resb " << calcStructSize(structs[n.type.name]) << "\n";
+                        bss << "\t" << n.name << ": resb " << calcStructSize(structs[n.type.name]) << "\n";
                     }
                     globalVariable.emplace(n.name);
                 },
                 [&](const nbuFrontend::FuncStmtNode& n) {
                     if (n.name != "main") {
-                        text_file << "\tglobal " << n.name << "\n";
-                        text_file << n.name << ":\n";
+                        text << "\tglobal " << n.name << "\n";
+                        text << n.name << ":\n";
                     }
                     else {
-                        text_file << "\tglobal _start" << "\n";
-                        text_file << "_start:\n";
+                        text << "\tglobal _start" << "\n";
+                        text << "_start:\n";
                     }
-                    text_file << nodeCalcString(*n.code);
-                    text_file << "\n";
+                    calcOffsets(*n.code);
+                    text << "\tpush rbp\n";
+                    text << "\tmov rbp, rsp\n";
+                    text << "\tsub rsp, "+std::to_string(alignOffset)+"\n";
+                    text << nodeCalcString(*n.code);
+                    text << "\n";
                 },
                 [&](const auto&) {}
             },node);
         }
-        data_file.close();
-        bss_file.close();
-        text_file.close();
-        std::ifstream data("output.data.tmp");
-        std::ifstream bss("output.bss.tmp");
-        std::ifstream text("output.text.tmp");
-        char c;
-
         file << data.rdbuf();
         file << bss.rdbuf();
         file << text.rdbuf();
+    }
 
-        std::remove("output.data.tmp");
-        std::remove("output.bss.tmp");
-        std::remove("output.text.tmp");
+    std::string CodeGen::strWordType(nbuFrontend::Type type) {
+        char size = nbuFrontend::typeSize[type.kind];
+        if (type.kind == nbuFrontend::Type::Kind::ENUM) {
+            size = nbuFrontend::typeSize[enums[type.name].backing_type.kind];
+        }
+        switch (size) {
+            case 1:
+                return "byte";
+            case 2:
+                return "word";
+            case 4:
+                return "dword";
+            case 8:
+                return "qword";
+            default:
+                return "byte";
+        }
+    }
+
+    std::string CodeGen::fieldPrint(const nbuFrontend::StructTypeInfo& info, nbuFrontend::Type type, std::string name) {
+        std::string ret ;
+        for (const auto& [fieldName, field] : info.fields) {
+            if (field.kind != nbuFrontend::Type::Kind::STRUCT) {
+                int offset = localOffsetMap[name + fieldName];
+                std::string modifier = strWordType(field);
+                ret += "\tmov " + modifier + " [rbp " + std::to_string(offset) + "], 0\n";
+            }
+            else {
+                ret += fieldPrint(info,field, name+fieldName+".");
+            }
+        }
+        return ret;
+    }
+
+    std::string strOperand(nbuFrontend::TokenType op) {
+        switch(op) {
+            case nbuFrontend::TokenType::AND:
+                return "and";
+            case nbuFrontend::TokenType::OR:
+                return "or";
+            case nbuFrontend::TokenType::NOT:
+                return "not";
+            case nbuFrontend::TokenType::SLASH:
+                return "idiv";
+            case nbuFrontend::TokenType::PLUS:
+                return "add";
+            case nbuFrontend::TokenType::MINUS:
+                return "sub";
+            case nbuFrontend::TokenType::STAR:
+                return "imul";
+            case nbuFrontend::TokenType::SHIFTL:
+                return "shl";
+            case nbuFrontend::TokenType::SHIFTR:
+                return "sar";
+            case nbuFrontend::TokenType::EXCLAMATION:
+                return "not"; // for now
+            default:
+                return "issue";
+        }
+    }
+
+    std::string CodeGen::strDivision(nbuFrontend::Type type) {
+char size = nbuFrontend::typeSize[type.kind];
+        if (type.kind == nbuFrontend::Type::Kind::ENUM) {
+            size = nbuFrontend::typeSize[enums[type.name].backing_type.kind];
+        }
+        switch (size) {
+            case 1:
+            case 2:
+                return "cwde";
+            case 4:
+                return "cdq";
+            case 8:
+                return "cqo";
+            default:
+                return "byte";
+        }
     }
 
     std::string CodeGen::nodeCalcString(const nbuFrontend::ASTNode& n) {
@@ -110,13 +180,166 @@ namespace nbuBackend {
                 ret += "\tret\n";
             },
             [&](const nbuFrontend::VariableDeclareNode& n) {
-                
+                if (n.type.kind != nbuFrontend::Type::Kind::STRUCT) {
+                    if (n.info != nullptr && !isConstant(*n.info))
+                        ret += nodeCalcString(*n.info);
+                    ret += "\tmov ";
+                    ret += strWordType(n.type);
+                    ret += " [rbp"+std::to_string(localOffsetMap[n.name])+"], ";
+                    if (n.info == nullptr)
+                        ret += std::string("0");
+                    if (isConstant(*n.info)) 
+                        ret += nodeCalcString(*n.info);
+                    else 
+                        ret += strRegistery(n.type);
+                    ret += "\n";
+                }
+                else {
+                    nbuFrontend::StructTypeInfo info = structs[n.type.name];
+                    ret += fieldPrint(info, n.type, n.name+".");
+                }
             }, 
+            [&](const nbuFrontend::BinaryOpNode& n) {
+                std::string registery = strRegistery(n.precision);
+                std::string scratchReg = (registery == "rax") ? "rcx" : "ecx";
+                if (isConstant(*n.left))
+                    ret += "\tmov "+registery+", ";
+                ret += nodeCalcString(*n.left);
+                ret += "\n\tpush rax\n";
+                if (isConstant(*n.right))
+                    ret += "\tmov "+registery+", ";
+                ret += nodeCalcString(*n.right);
+                ret += "\n\tmov " + scratchReg + ", " + registery + "\n";
+                ret += "\n\tpop rax\n";
+                if (n.op != nbuFrontend::TokenType::SLASH && n.op != nbuFrontend::TokenType::PERCENT) {
+                    ret += "\t"+strOperand(n.op) + " "+registery+", "+scratchReg+"\n";
+                }
+                else { 
+                    ret += "\t"+strDivision(n.precision);
+                    ret += "\n\tidiv "+scratchReg;
+                }
+                ret += "\n";
+            },
+            [&](const nbuFrontend::VariableAccessNode& n) {
+                ret += "[rbp"+std::to_string(localOffsetMap[n.name])+"]";
+            },
+            [&](const nbuFrontend::Int32LiteralNode& n) {
+                ret += std::to_string(n.value);
+            },
+            [&](const nbuFrontend::Float32LiteralNode& n) {
+                ret += std::to_string(n.value);
+            },
+            [&](const nbuFrontend::EnumAccessNode& n) {
+                ret += std::to_string(enums[n.enumName+"::"+n.enumMember].raw_value);
+            },
             [&](const auto&) {
-                ret += "\tret\n";
+                ret += "\n";
             }
         },n);
         return ret;
+    }
+
+    bool CodeGen::isConstant(const nbuFrontend::ASTNode& node) {
+        return std::visit(overloads {
+            [](const nbuFrontend::Int32LiteralNode&) {return true;},
+            [](const nbuFrontend::Float32LiteralNode&) {return true;},
+            [](const nbuFrontend::VariableAccessNode&) {return true;},
+            [](const nbuFrontend::EnumAccessNode&) {return true;},
+            [](const auto&) {return false;}
+        }, node);
+    }
+
+    std::string CodeGen::strRegistery(nbuFrontend::Type type) {
+        char size = nbuFrontend::typeSize[type.kind];
+        if (type.kind == nbuFrontend::Type::Kind::ENUM) {
+            size = nbuFrontend::typeSize[enums[type.name].backing_type.kind];
+        }
+        switch (size) {
+            case 1:
+                return "al";
+            case 2:
+                return "ax";
+            case 4:
+                return "eax";
+            case 8:
+                return "rax";
+            default:
+                return "al";
+        }
+    }
+
+    void CodeGen::calcOffsets(const nbuFrontend::ASTNode& n) {
+        localOffsetCursor = 0;
+        localOffsetMap.clear();
+        
+        runOffsetWalker(n);
+
+        alignOffset = (localOffsetCursor + 15) & ~15;
+    }
+
+    void CodeGen::runOffsetWalker(const nbuFrontend::ASTNode& n) {
+        std::visit(overloads {
+            [&](const nbuFrontend::VariableDeclareNode& node) {
+                if (node.type.kind == nbuFrontend::Type::Kind::ENUM) {
+                    int fieldSize = nbuFrontend::typeSize[enums[node.name].backing_type.kind];
+                
+                    if (localOffsetCursor % fieldSize != 0) {
+                        localOffsetCursor += (fieldSize - (localOffsetCursor % fieldSize));
+                    }
+
+                    localOffsetCursor += fieldSize;
+                    localOffsetMap.emplace(node.name, -localOffsetCursor);
+                }
+                else if (node.type.kind != nbuFrontend::Type::Kind::STRUCT) {
+                    int fieldSize = nbuFrontend::typeSize[node.type.kind];
+                
+                    if (localOffsetCursor % fieldSize != 0) {
+                        localOffsetCursor += (fieldSize - (localOffsetCursor % fieldSize));
+                    }
+
+                    localOffsetCursor += fieldSize;
+                    localOffsetMap.emplace(node.name, -localOffsetCursor);
+                }
+                else {
+                    structOffsets(node.type,node.name+".");
+                }
+            },
+            [&](const nbuFrontend::BlockStmtNode& node) {
+                for (const auto& code : node.codes) {
+                    runOffsetWalker(*code);
+                }
+            },
+            [&](const auto&) {}
+        },n);
+    }
+
+    void CodeGen::structOffsets(const nbuFrontend::Type& n, std::string name) {
+        nbuFrontend::StructTypeInfo info = structs[n.name];
+        for (const auto& [fieldName, field] : info.fields) {
+            if (n.kind == nbuFrontend::Type::Kind::ENUM) {
+                    int fieldSize = nbuFrontend::typeSize[enums[n.name].backing_type.kind];
+                
+                    if (localOffsetCursor % fieldSize != 0) {
+                        localOffsetCursor += (fieldSize - (localOffsetCursor % fieldSize));
+                    }
+
+                    localOffsetCursor += fieldSize;
+                    localOffsetMap.emplace(n.name, -localOffsetCursor);
+                }
+            else if (field.kind != nbuFrontend::Type::Kind::STRUCT) {
+                int fieldSize = nbuFrontend::typeSize[field.kind]; // 🌟 Fixed: use field.kind, not n.kind!
+
+                // Handle struct internal alignment
+                if (localOffsetCursor % fieldSize != 0) {
+                    localOffsetCursor += (fieldSize - (localOffsetCursor % fieldSize));
+                }
+
+                localOffsetCursor += fieldSize;
+                localOffsetMap.emplace(name + fieldName, -localOffsetCursor);
+            }
+            else 
+                structOffsets(field, name+fieldName+".");
+        }
     }
 
     int CodeGen::calcStructSize(nbuFrontend::StructTypeInfo& info) {
