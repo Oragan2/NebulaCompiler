@@ -32,7 +32,7 @@ int32 main() {
     b.back_link = 12;
     int32 x = 2*2/3;
     int32 y = x+1;
-    int32 z = 2;
+    int32 z = b.back_link;
     x = test(x);
     if (x == y)
         int32 tmp = 1;
@@ -43,7 +43,8 @@ int32 main() {
     vaddr data = 123;
     write32(data,32);
     x = read32(data);
-    cart = 13.1;
+    cart = 13.3;
+    float32 d = cart+12.0;
     asm {
         xor rax, rax
     }

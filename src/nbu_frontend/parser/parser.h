@@ -61,6 +61,7 @@ namespace nbuFrontend {
 
     struct VariableAccessNode {
         std::string name; 
+        Type precision;
     }; //Temp implementation will be changed later
 
     struct UnaryOpNode {
@@ -94,6 +95,7 @@ namespace nbuFrontend {
     struct VariableModNode {
         ASTNode* variable;
         ASTNode* info;
+        Type precision;
     };
 
     struct PromotionNode {

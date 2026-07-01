@@ -101,6 +101,7 @@ namespace nbuFrontend {
                             max_value = member.second;
                         }
                     }
+                    globalEnumRegistry.emplace(n.name, EnumVariantInfo{.backing_type = max_value > 255 ? Type{Type::Kind::UINT16} : Type{Type::Kind::UINT8}});
                     for (const auto&[member,value] : n.members) {
                         globalEnumRegistry.emplace(n.name+"::"+member, EnumVariantInfo{value, max_value > 255 ? Type{Type::Kind::UINT16} : Type{Type::Kind::UINT8}});
                     }
@@ -205,8 +206,13 @@ namespace nbuFrontend {
             [this](VariableAccessNode& n) {
                 char found = 0;
                 for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
-                    if (it->contains(n.name) || globalSymbolTable.contains(n.name))
+                    if (it->contains(n.name) || globalSymbolTable.contains(n.name)) {
                         found = 1;
+                        if (it->contains(n.name))
+                            n.precision = it->at(n.name).type;
+                        else
+                            n.precision = globalSymbolTable[n.name].type;
+                    }
                 }
                 if (!found) {
                     print_error("Variable "+n.name+" not declared inside this scope");
@@ -285,6 +291,7 @@ namespace nbuFrontend {
                     }
                     n.info = arena.allocate<ASTNode>(PromotionNode{promote, retType, n.info});
                 }
+                n.precision = var.type;
             },
             [this](readAddrNode& n) {
                 codeSemanticAnalyses(*n.addr);
@@ -308,8 +315,12 @@ namespace nbuFrontend {
                 }
             },
             [this](StructAccessNode& n) {
-                SymboleInfo vInfo;
                 codeSemanticAnalyses(*n.firstPart);
+                Type base = type_precision(*n.firstPart);
+                StructTypeInfo info = globalStructRegistery[base.name];
+                if (!info.fields.contains(n.fieldName)) {
+                    print_error("Struct "+base.name+" doesn't have "+n.fieldName+" as a field");
+                }
             },
             [this](StructDeclNode& n) {
                 print_error("Can't declare an enum inside a function"); // will maybe be changed later though probably not
@@ -386,6 +397,11 @@ namespace nbuFrontend {
             [this](const EnumAccessNode& n) {
                 return globalEnumRegistry[n.enumName+"::"+n.enumMember].backing_type;
             },
+            [this](const StructAccessNode& n) {
+                Type base = type_precision(*n.firstPart);
+                StructTypeInfo info = globalStructRegistery[base.name];
+                return info.fields[n.fieldName];
+            },
             [this](const auto&) {print_error("Uh?"); return Type{.kind = Type::Kind::INT32};}
         }, node);
     }
@@ -405,19 +421,18 @@ namespace nbuFrontend {
     Type Semantic::tryPromote(const Type currentType, const Type promoteTo) {
         if (resolve_type(currentType, promoteTo) == promoteTo)
             return promoteTo;
-        if (currentType.kind == Type::Kind::INT32 && promoteTo.kind == Type::Kind::INT64) return promoteTo;
-        if (currentType.kind == Type::Kind::UINT32 && promoteTo.kind == Type::Kind::UINT64) return promoteTo;
-        if (currentType.kind == Type::Kind::UINT32 && promoteTo.kind == Type::Kind::INT64) return promoteTo;
-        if (currentType.kind == Type::Kind::UINT32 && promoteTo.kind == Type::Kind::INT32) return promoteTo;
-    if (currentType.kind == Type::Kind::UINT64 && promoteTo.kind == Type::Kind::INT64) return promoteTo;
-        if (promoteTo.kind == Type::Kind::ENUM) {
-            if (currentType.kind == Type::Kind::ENUM && currentType.name == promoteTo.name) {
-                return promoteTo;
-            }
-            if (currentType.kind == Type::Kind::UINT8 || currentType.kind == Type::Kind::UINT16) {
-                return promoteTo; 
-            }
+        int currentSize = typeSize[currentType.kind];
+        int targetSize = typeSize[promoteTo.kind];
+        if (currentType.kind == Type::Kind::ENUM) {
+            currentSize = typeSize[globalEnumRegistry[currentType.name].backing_type.kind];
         }
+        if (promoteTo.kind == Type::Kind::ENUM) {
+            targetSize = typeSize[globalEnumRegistry[promoteTo.name].backing_type.kind];
+        }
+        if (targetSize > currentSize) 
+            return promoteTo; 
+        if (currentSize == targetSize) 
+            return promoteTo;
         return currentType;
     }
 

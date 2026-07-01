@@ -157,7 +157,7 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  print_tree(semantic.getNodes());
+  //print_tree(semantic.getNodes());
 
   std::ofstream outputFile("a.out");
 
