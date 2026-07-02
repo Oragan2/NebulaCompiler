@@ -12,13 +12,49 @@ template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 namespace nbuBackend {
     CodeGen::CodeGen(std::vector<nbuFrontend::ASTNode>& nodes, std::ofstream& file, std::unordered_map<std::string, nbuFrontend::StructTypeInfo>& structs, std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums) : nodes{nodes}, file{file}, structs{structs}, enums{enums} {}
     
-    void CodeGen::emit(const std::string& op, const std::string& dst, const std::string& src) {
-        text << "\t" << op;
-        if (!dst.empty())
-            text << " "+dst;
-        if (!src.empty())
-            text << ", " << src;
-        text << "\n";
+    void CodeGen::emit(const Op& op, const Operand& dst, const Operand& src, int byteSize) {
+        std::string reg1;
+        switch (dst.type) {
+            case Operand::Type::None:
+                break;
+            case Operand::Type::Imm:
+                reg1 = std::to_string(dst.immValue);
+                break;
+            case Operand::Type::Reg:
+                
+                break;
+            case Operand::Type::Mem:
+                reg1 += WordType(byteSize) + " ";
+                if (dst.mem.isGlobal) {
+                    reg1 += "["+dst.mem.globalLabel+"]";
+                }
+                else {
+                    reg1 += "["+regToStr(dst.mem.baseReg)+std::to_string(dst.mem.offset)+"]";
+                }
+        }
+    }
+
+    std::string regToStr(Register a) {
+        switch (a) {
+            case Register::A:
+                return "a";
+            case Register::B:
+                return "b";
+            case Register::C:
+                return "c";
+            case Register::D:
+                return "d";
+            case Register::XMM0:
+                return "xmm0";
+            case Register::XMM1:
+                return "xmm1";
+            case Register::RBP:
+                return "rbp";
+            case Register::RSP:
+                return "rsp";
+            case Register::None:
+                return "none";
+        }
     }
 
     void CodeGen::emitLabel(const std::string& name) {
@@ -87,26 +123,23 @@ namespace nbuBackend {
                         emitLabel("_start");
                     }
                     calcOffsets(*n.code);
-                    emit("push","rbp");
-                    emit("mov","rbp","rsp");
-                    emit("sub","rsp",std::to_string(alignOffset));
+                    emit(Op::PUSH,Register::RBP);
+                    emit(Op::MOV,Register::RBP,Register::RSP);
+                    emit(Op::SUB,Register::RSP,alignOffset);
                     nodeCalcString(*n.code);
                 },
                 [&](const auto&) {}
             },node);
         }
+        file << "default rel\n";
         file << data.rdbuf();
         file << bss.rdbuf();
         file << rodata.rdbuf();
         file << text.rdbuf();
     }
 
-    std::string CodeGen::strWordType(nbuFrontend::Type type) {
-        signed char size = nbuFrontend::typeSize[type.kind];
-        if (type.kind == nbuFrontend::Type::Kind::ENUM) {
-            size = nbuFrontend::typeSize[enums[type.name].backing_type.kind];
-        }
-        switch (size) {
+    std::string CodeGen::WordType(int byteSize) {
+        switch (byteSize) {
             case 1:
                 return "byte";
             case 2:
@@ -124,8 +157,10 @@ namespace nbuBackend {
         for (const auto& [fieldName, field] : info.fields) {
             if (field.kind != nbuFrontend::Type::Kind::STRUCT) {
                 int offset = localOffsetMap[name + fieldName];
-                std::string modifier = strWordType(field);
-                emit("mov", modifier + " [rbp" + std::to_string(offset) + "]", "0");
+                MemoryOperand mem;
+                mem.globalLabel = name+fieldName;
+                mem.offset = offset;
+                emit(Op::MOV, mem, 0);
                 emitComment(name+fieldName+" "+std::to_string(offset));
             }
             else {
@@ -134,48 +169,30 @@ namespace nbuBackend {
         }
     }
 
-    std::string strOperand(nbuFrontend::TokenType op) {
+    Op Operand(nbuFrontend::TokenType op) {
         switch(op) {
             case nbuFrontend::TokenType::AND:
-                return "and";
+                return Op::AND;
             case nbuFrontend::TokenType::OR:
-                return "or";
+                return Op::OR;
             case nbuFrontend::TokenType::NOT:
-                return "not";
+                return Op::NOT;
             case nbuFrontend::TokenType::SLASH:
-                return "idiv";
+                return Op::DIV;
             case nbuFrontend::TokenType::PLUS:
-                return "add";
+                return Op::ADD;
             case nbuFrontend::TokenType::MINUS:
-                return "sub";
+                return Op::SUB;
             case nbuFrontend::TokenType::STAR:
-                return "imul";
+                return Op::MUL;
             case nbuFrontend::TokenType::SHIFTL:
-                return "shl";
+                return Op::SHL;
             case nbuFrontend::TokenType::SHIFTR:
-                return "sar";
+                return Op::SAR;
             case nbuFrontend::TokenType::EXCLAMATION:
-                return "not"; // for now
+                return Op::NOT; // for now
             default:
-                return "issue";
-        }
-    }
-
-    std::string CodeGen::strDivision(nbuFrontend::Type type) {
-        char size = nbuFrontend::typeSize[type.kind];
-        if (type.kind == nbuFrontend::Type::Kind::ENUM) {
-            size = nbuFrontend::typeSize[enums[type.name].backing_type.kind];
-        }
-        switch (size) {
-            case 1:
-            case 2:
-                return "cwde";
-            case 4:
-                return "cdq";
-            case 8:
-                return "cqo";
-            default:
-                return "cwde";
+                return Op::MOV;
         }
     }
 
@@ -193,30 +210,30 @@ namespace nbuBackend {
                 if (n.expression != nullptr)
                     nodeCalcString(*n.expression);
                 if (currentLabel != "_start") {
-                    emit("mov","rsp","rbp");
-                    emit("pop","rbp");
-                    emit("ret");
+                    emit(Op::MOV,Register::RSP,Register::RBP);
+                    emit(Op::POP,Register::RBP);
+                    emit(Op::RET);
                 }
                 else {
-                    emit("mov","edi","eax");
-                    emit("mov","eax","60");
-                    emit("syscall");
+                    emit(Op::MOV,Register::D,Register::A);
+                    emit(Op::MOV,Register::A,60);
+                    emit(Op::SYSCALL);
                 }
             },
             [&](const nbuFrontend::VariableDeclareNode& n) {
                 if (n.type.kind != nbuFrontend::Type::Kind::STRUCT) {
                     if (n.info != nullptr && !isConstant(*n.info))
                         nodeCalcString(*n.info);
-                    std::string dst = strWordType(n.type)+" [rbp"+std::to_string(localOffsetMap[n.name])+"]";
+                    MemoryOperand mem;
+                    mem.offset = localOffsetMap[n.name];
+                    mem.scale = nbuFrontend::typeSize[n.type.kind];
+                    mem.baseReg = Register::RSP;
                     if (n.info == nullptr) {
-                        std::string reg = strRegistery(n.type);
-                        emit("xor", reg, reg);
+                        emit(Op::XOR, Register::A, Register::A);
                     }
                     if (isConstant(*n.info)) 
                         nodeCalcString(*n.info);
-
-                    std::string src = strRegistery(n.type);
-                    emit("mov",dst,src);
+                    emit(Op::MOV,mem,Register::A);
                     emitComment(n.name+" "+std::to_string(localOffsetMap[n.name]));
                 }
                 else {
@@ -225,94 +242,109 @@ namespace nbuBackend {
                 }
             }, 
             [&](const nbuFrontend::BinaryOpNode& n) {
-                std::string registery = strRegistery(n.precision);
-                std::string scratchReg = (registery == "rax") ? "rcx" : "ecx";
-                std::string op = (registery == "xmm0") ? "movss" : "mov";
-                if (registery == "xmm0") 
-                    scratchReg = "xmm1";
+                bool isFloat = (n.precision.kind == nbuFrontend::Type::Kind::FLOAT32 || n.precision.kind == nbuFrontend::Type::Kind::FLOAT64);
+                Register registery = isFloat ? Register::XMM0 : Register::A;
+                Register scratch = isFloat ? Register::XMM1 : Register::C;
                 nodeCalcString(*n.left);
-                if (registery == "xmm0") {
-                    emit("sub","rsp","8");
-                    emit("movss","[rsp]","xmm0");
+                if (isFloat) {
+                    emit(Op::SUB,Register::RSP,8);
+                    MemoryOperand mem;
+                    mem.offset = 0;
+                    mem.baseReg = Register::RSP;
+                    int size = nbuFrontend::typeSize[n.precision.kind];
+                    emit(Op::MOV,mem,Register::XMM0,size);
                 }
                 else
-                    emit("push","rax");
+                    emit(Op::PUSH,Register::A);
                 nodeCalcString(*n.right);
-                emit(op,scratchReg,registery);
-                if (registery == "xmm0") {
-                    emit("movss","xmm0","[rsp]");
-                    emit("add","rsp","8");
+                emit(Op::MOV,scratch,registery);
+                if (isFloat) {
+                    MemoryOperand mem;
+                    mem.offset = 0;
+                    mem.baseReg = Register::RSP;
+                    emit(Op::MOV,Register::XMM0,mem);
+                    emit(Op::ADD,Register::RSP,8);
                 }
-                else
-                    emit("pop","rax");
+                else {
+                    emit(Op::POP,Register::A);
+                }
                 if (n.op != nbuFrontend::TokenType::SLASH && n.op != nbuFrontend::TokenType::PERCENT) {
-                    std::string op = strOperand(n.op);
-                    if (registery == "xmm0") op += "ss";
-                    emit(op,registery,scratchReg);
+                    Op op = Operand(n.op);
+                    emit(op,registery,scratch);
                 }
                 else { 
-                    emit(strDivision(n.precision));
-                    emit("idiv",scratchReg);
+                    Op extensionOp;
+                    switch (nbuFrontend::typeSize[n.precision.kind]) {
+                        case 1:  extensionOp = Op::CBW; break; // AL -> AX
+                        case 2:  extensionOp = Op::CWD; break; // AX -> DX:AX
+                        case 4:  extensionOp = Op::CDQ; break; // EAX -> EDX:EAX
+                        case 8:  extensionOp = Op::CQO; break; // RAX -> RDX:RAX
+                        default: extensionOp = Op::CDQ; break;
+                    }
+                    emit(extensionOp);
+                    emit(Op::DIV,scratch);
                     if (n.op == nbuFrontend::TokenType::PERCENT) {
-                        std::string remainderReg = (registery == "rax") ? "rdx" : "edx";
-                        emit("mov", registery, remainderReg);
+                        emit(Op::MOV, registery, Register::D);
                     }
                 }
             },
             [&](const nbuFrontend::VariableAccessNode& n) {
-                std::string op;
-                if (n.precision.kind != nbuFrontend::Type::Kind::FLOAT32 || n.precision.kind != nbuFrontend::Type::Kind::FLOAT64) op = "mov";
-                else op = "movss";
+                Register reg = (n.precision.kind == nbuFrontend::Type::Kind::FLOAT32 || n.precision.kind == nbuFrontend::Type::Kind::FLOAT64) ? Register::XMM0 : Register::A;
+                int size = nbuFrontend::typeSize[n.precision.kind];
                 if (localOffsetMap.contains(n.name)) {
-                    std::string reg = strRegistery(n.precision);
-                    std::string src = "dword [rbp" + std::to_string(localOffsetMap[n.name]) + "]";
-                    emit(op, reg, src);
+                    MemoryOperand mem;
+                    mem.offset = localOffsetMap[mem.globalLabel];
+                    emit(Op::MOV, reg, mem,size);
                     emitComment(n.name+" "+std::to_string(localOffsetMap[n.name]));
                 }
                 else {
-                    std::string reg = strRegistery(n.precision);
-                    std::string src = "["+n.name+"]";
-                    emit(op,reg,src);
+                    MemoryOperand mem;
+                    mem.globalLabel = n.name;
+                    mem.isGlobal = true;
+                    emit(Op::MOV,reg,mem,size);
                     emitComment(n.name);
                 }
             },
             [&](const nbuFrontend::StructAccessNode& n) {
                 std::string name = getFlatKey(*n.firstPart);
-                std::string reg = strRegistery(structs[name].fields[n.fieldName]);
+                Register reg = (structs[name].fields[n.fieldName] == nbuFrontend::Type{nbuFrontend::Type::Kind::FLOAT32} || structs[name].fields[n.fieldName] == nbuFrontend::Type{nbuFrontend::Type::Kind::FLOAT32}) ? Register::XMM0 : Register::A;
                 std::string src = "dword [rbp" + std::to_string(localOffsetMap[name+"."+n.fieldName]) + "]";
-                emit("mov",reg,src);
+                MemoryOperand mem;
+                mem.baseReg = Register::RSP;
+                mem.globalLabel = name+"."+n.fieldName;
+                mem.offset = localOffsetMap[name+"."+n.fieldName];
+                emit(Op::MOV,reg,mem);
                 emitComment(name+"."+n.fieldName);
             },
             [&](const nbuFrontend::Int32LiteralNode& n) {
-                emit("mov","eax",std::to_string(n.value));
+                emit(Op::MOV,Register::A,n.value);
             },
             [&](const nbuFrontend::Float32LiteralNode& n) {
-                std::string floatLabel = ".LC" + std::to_string(labelCounter++);
+                std::string floatLabel = "_flt_const_" + std::to_string(labelCounter++);
     
                 rodata << "\t" << floatLabel << ": dd " << n.value << "\n";
-    
-                emit("movss", "xmm0", "[rel " + floatLabel + "]");
+                MemoryOperand mem;
+                mem.globalLabel = floatLabel;
+                mem.isGlobal = true;
+                emit(Op::MOV, Register::XMM0,mem,4);
             },
             [&](const nbuFrontend::EnumAccessNode& n) {
-                std::string reg = strRegistery(enums[n.enumName].backing_type);
-                std::string src = std::to_string(enums[n.enumName+"::"+n.enumMember].raw_value);
-                emit("mov", reg, src);
+                int src = enums[n.enumName+"::"+n.enumMember].raw_value;
+                emit(Op::MOV, Register::A, src,nbuFrontend::typeSize[enums[n.enumName].backing_type.kind]);
             },
             [&](const nbuFrontend::VariableModNode& n) {
+                bool isFloat = (n.precision.kind == nbuFrontend::Type::Kind::FLOAT32 || n.precision.kind == nbuFrontend::Type::Kind::FLOAT64);
                 nodeCalcString(*n.info);
                 std::string flatKey = getFlatKey(*n.variable);
-                std::string src = strRegistery(n.precision);
-                std::string dst;
-                std::string op;
-                if (n.precision.kind != nbuFrontend::Type::Kind::FLOAT32 && n.precision.kind != nbuFrontend::Type::Kind::FLOAT64) op = "mov";
-                else op = "movss";
-                std::cout << n.precision << " " << flatKey << " " << op << std::endl;
+                Register src = isFloat ? Register::XMM0 : Register::A;
+                MemoryOperand mem;
                 if (localOffsetMap.find(flatKey) != localOffsetMap.end()) {
-                    dst = strWordType(n.precision)+" [rbp" + std::to_string(localOffsetMap[flatKey]) + "]";
+                    mem.offset = localOffsetMap[flatKey];
                 } else {
-                    dst = strWordType(n.precision)+" [" + flatKey + "]";
+                    mem.isGlobal = true;
+                    mem.globalLabel = flatKey;
                 }
-                emit(op, dst, src);
+                emit(Op::MOV, mem, src);
                 emitComment(flatKey+" "+std::to_string(localOffsetMap[flatKey]));
             },
             [&](const nbuFrontend::PromotionNode& n) {
@@ -326,26 +358,10 @@ namespace nbuBackend {
                 bool dstFloat = (n.topromote.kind == nbuFrontend::Type::Kind::FLOAT32 || n.topromote.kind == nbuFrontend::Type::Kind::FLOAT64);
                 int srcSize = nbuFrontend::typeSize[n.was.kind];
                 int dstSize = nbuFrontend::typeSize[n.topromote.kind];
+                Register dst = dstFloat ? Register::XMM0 : Register::A;
+                Register src = srcFloat ? Register::XMM0 : Register::A;
 
-                if (srcSize == dstSize) return;
-
-                if (srcSize < dstSize && !srcFloat && !dstFloat) {
-                    if (srcSigned) {
-                        if (srcSize == 1 && dstSize == 4) emit("movsx", "eax", "al");
-                        if (srcSize == 1 && dstSize == 2) emit("movsx", "ax", "al");
-                        if (srcSize == 2 && dstSize == 4) emit("movsx", "eax", "ax");
-                        if (srcSize == 4 && dstSize == 8) emit("movsxd", "rax", "eax");
-                    } else {
-                        if (srcSize == 1 && dstSize == 4) emit("movzx", "eax", "al");
-                        if (srcSize == 1 && dstSize == 2) emit("movzx", "ax", "al");
-                        if (srcSize == 2 && dstSize == 4) emit("movzx", "eax", "ax");
-                        if (srcSize == 4 && dstSize == 8) emit("mov", "eax", "eax");
-                    }
-                }
-                if (dstFloat && !srcFloat) 
-                    emit("cvtsi2ss", "xmm0","eax");
-                if (srcFloat && !dstFloat)
-                    emit("cvttss2si", "eax", "xmm0");
+                emitConv(dst, dstSize, src, srcSize, srcSigned);
             },
             [&](const auto&) {
                 text << "\n";
@@ -375,29 +391,6 @@ namespace nbuBackend {
             [](const nbuFrontend::EnumAccessNode&) {return true;},
             [](const auto&) {return false;}
         }, node);
-    }
-
-    std::string CodeGen::strRegistery(nbuFrontend::Type type) {
-        char size = nbuFrontend::typeSize[type.kind];
-        if (type.kind == nbuFrontend::Type::Kind::ENUM) {
-            size = nbuFrontend::typeSize[enums[type.name].backing_type.kind];
-        }
-        if (type.kind != nbuFrontend::Type::Kind::FLOAT32 && type.kind != nbuFrontend::Type::Kind::FLOAT64)
-            switch (size) {
-                case 1:
-                    return "al";
-                case 2:
-                    return "ax";
-                case 4:
-                    return "eax";
-                case 8:
-                    return "rax";
-                default:
-                    return "al";
-            }
-        else {
-            return "xmm0";
-        }
     }
 
     void CodeGen::calcOffsets(const nbuFrontend::ASTNode& n) {

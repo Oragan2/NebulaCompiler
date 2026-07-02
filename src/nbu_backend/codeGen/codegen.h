@@ -2,6 +2,7 @@
 #define CODEGEN_H
 
 #include "../../nbu_frontend/parser/parser.h"
+#include <cstdint>
 #include <fstream>
 #include <string>
 #include <sstream>
@@ -10,6 +11,52 @@
 #include <unordered_set>
 
 namespace nbuBackend {
+    enum class Register {
+        A, // Accumulator
+        B, // Base
+        C, // Counter
+        D, // Data
+        XMM0,
+        XMM1,
+        RSP,
+        RBP,
+        None
+    };
+
+    std::string regToStr(Register);
+
+    enum class Op {
+        ADD, SUB, MUL, DIV, MOV, PUSH, POP, RET, SYSCALL,
+        XOR, NOT, AND, OR, SHL, SAR, CBW, CWD, CDQ, CQO
+    };
+
+    struct MemoryOperand {
+        Register baseReg = Register::RBP;
+        int offset = 0;
+        
+        bool isIndexed = false;
+        Register indexReg = Register::C;
+        int scale = 1;
+
+        std::string globalLabel;
+        bool isGlobal = false;
+    };
+
+    struct Operand {
+        enum class Type {None, Reg, Imm, Mem};
+        Type type = Type::None;
+        
+        Register reg = Register::None;
+        int64_t immValue = 0;
+        MemoryOperand mem;
+
+        Operand() : type(Type::None) {}
+        Operand(Register r) : type{Type::Reg}, reg{r} {}
+        Operand(int64_t imm) : type(Type::Imm), immValue(imm) {}
+        Operand(int imm) : type(Type::Imm), immValue(imm) {}
+        Operand(MemoryOperand m) : type(Type::Mem), mem(m) {}
+    };
+    
     class CodeGen {
         public:
         CodeGen(std::vector<nbuFrontend::ASTNode>& nodes, std::ofstream& file, std::unordered_map<std::string, nbuFrontend::StructTypeInfo>& structs, std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums);
@@ -23,14 +70,16 @@ namespace nbuBackend {
         void runOffsetWalker(const nbuFrontend::ASTNode& n);
         void structOffsets(const nbuFrontend::Type& n, std::string name);
         void fieldPrint(const nbuFrontend::StructTypeInfo& info, nbuFrontend::Type type, std::string name);
-        std::string strWordType(nbuFrontend::Type type);
-        std::string strRegistery(nbuFrontend::Type type);
+        std::string WordType(int byteSize);
         std::string strDivision(nbuFrontend::Type type);
         std::string getFlatKey(const nbuFrontend::ASTNode& node);
         bool isConstant(const nbuFrontend::ASTNode& node);
-        void emit(const std::string& op, const std::string& dst="", const std::string& src="");
+
+        void emit(const Op& op, const Operand& dst=Operand(), const Operand& src=Operand(), int byteSize=4);
+        void emitConv(const Register& dst, int dstSize, const Register& src, int srcSize, bool srcSigned);
         void emitLabel(const std::string& name);
         void emitComment(const std::string& comment);
+
         std::vector<nbuFrontend::ASTNode>& nodes;
         std::unordered_map<std::string, nbuFrontend::StructTypeInfo>& structs;
         std::unordered_map<std::string, int> localOffsetMap;
