@@ -11,24 +11,27 @@
 #include <unordered_set>
 
 namespace nbuBackend {
-    enum class Register {
-        A, // Accumulator
-        B, // Base
-        C, // Counter
-        D, // Data
-        XMM0,
-        XMM1,
-        RSP,
-        RBP,
-        None
+    enum class Register : uint8_t {
+        A = 0x01, // Accumulator
+        B = 0x02, // Base
+        C = 0x03, // Counter
+        D = 0x04, // Data
+        XMM0 = 0x10,
+        XMM1 = 0x11,
+        RSP = 0x05,
+        RBP = 0x06,
+        None = 0x00
     };
 
-    std::string regToStr(Register);
+    std::string regToStr(const Register&);
+    std::string WordType(int bytesize);
 
     enum class Op {
         ADD, SUB, MUL, DIV, MOV, PUSH, POP, RET, SYSCALL,
         XOR, NOT, AND, OR, SHL, SAR, CBW, CWD, CDQ, CQO
     };
+
+    std::string opToStr(const Op& op);
 
     struct MemoryOperand {
         Register baseReg = Register::RBP;
@@ -56,6 +59,8 @@ namespace nbuBackend {
         Operand(int imm) : type(Type::Imm), immValue(imm) {}
         Operand(MemoryOperand m) : type(Type::Mem), mem(m) {}
     };
+
+    std::string formatOperand(const Operand& op, int byteSize);
     
     class CodeGen {
         public:
@@ -70,7 +75,6 @@ namespace nbuBackend {
         void runOffsetWalker(const nbuFrontend::ASTNode& n);
         void structOffsets(const nbuFrontend::Type& n, std::string name);
         void fieldPrint(const nbuFrontend::StructTypeInfo& info, nbuFrontend::Type type, std::string name);
-        std::string WordType(int byteSize);
         std::string strDivision(nbuFrontend::Type type);
         std::string getFlatKey(const nbuFrontend::ASTNode& node);
         bool isConstant(const nbuFrontend::ASTNode& node);

@@ -1,5 +1,6 @@
 #include "codegen.h"
 #include "../../nbu_frontend/parser/parser.h"
+#include <cstdint>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -13,25 +14,94 @@ namespace nbuBackend {
     CodeGen::CodeGen(std::vector<nbuFrontend::ASTNode>& nodes, std::ofstream& file, std::unordered_map<std::string, nbuFrontend::StructTypeInfo>& structs, std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums) : nodes{nodes}, file{file}, structs{structs}, enums{enums} {}
     
     void CodeGen::emit(const Op& op, const Operand& dst, const Operand& src, int byteSize) {
-        std::string reg1;
-        switch (dst.type) {
+        std::string reg1 = formatOperand(dst, byteSize);
+        std::string reg2 = formatOperand(src, byteSize);
+        bool isFloat = (reg1.find("xmm") < std::string::npos || reg2.find("xmm") < std::string::npos);
+        std::string opStr = opToStr(op);
+        
+    }
+
+    std::string opToStr(const Op &op) {
+        switch (op) {
+            case Op::ADD:
+                return "add";
+            case Op::OR:
+                return "or";
+            case Op::NOT:
+                return "not";
+            case Op::AND:
+                return "and";
+            case Op::CBW:
+                return "cbw";
+            case Op::CDQ:
+                return "cdq";
+            case Op::CWD:
+                return "cwd";
+            case Op::CQO:
+                return "cqo";
+            case Op::DIV:
+                return "div";
+            case Op::MOV:
+                return "mov";
+            case Op::MUL:
+                return "mul";
+            case Op::POP:
+                return "pop";
+            case Op::PUSH:
+                return "push";
+            case Op::RET:
+                return "ret";
+            case Op::SAR:
+                return "sar";
+            case Op::SHL:
+                return "shl";
+            case Op::SUB:
+                return "sub";
+            case Op::SYSCALL:
+                return "syscall";
+            case Op::XOR:
+                return "xor";
+        }
+    }
+
+    std::string formatOperand(const Operand& op, int byteSize) {
+        std::string ret;
+        switch (op.type) {
             case Operand::Type::None:
                 break;
             case Operand::Type::Imm:
-                reg1 = std::to_string(dst.immValue);
+                ret = std::to_string(op.immValue);
                 break;
             case Operand::Type::Reg:
-                
-                break;
-            case Operand::Type::Mem:
-                reg1 += WordType(byteSize) + " ";
-                if (dst.mem.isGlobal) {
-                    reg1 += "["+dst.mem.globalLabel+"]";
+                if ((static_cast<uint8_t>(op.reg) & 0x10) != 0) {
+                    ret += regToStr(op.reg);
                 }
                 else {
-                    reg1 += "["+regToStr(dst.mem.baseReg)+std::to_string(dst.mem.offset)+"]";
+                    if (op.reg == Register::RSP || op.reg == Register::RBP) {
+                        std::string base = (op.reg == Register::RSP) ? "sp" : "bp";
+                        if (byteSize == 8) ret += "r" + base;
+                        if (byteSize == 4) ret += "e" + base;
+                        if (byteSize == 2) ret += base;
+                        if (byteSize == 1) ret += base + "l";
+                    } 
+                    else {
+                        if (byteSize == 8) ret += "r" + regToStr(op.reg) + "x";
+                        if (byteSize == 4) ret += "e" + regToStr(op.reg) + "x";
+                        if (byteSize == 2) ret += regToStr(op.reg) + "x";
+                        if (byteSize == 1) ret += regToStr(op.reg) + "l";
+                    }
+                }
+                break;
+            case Operand::Type::Mem:
+                ret += WordType(byteSize) + " ";
+                if (op.mem.isGlobal) {
+                    ret += "["+op.mem.globalLabel+"]";
+                }
+                else {
+                    ret += "["+regToStr(op.mem.baseReg)+std::to_string(op.mem.offset)+"]";
                 }
         }
+        return ret;
     }
 
     std::string regToStr(Register a) {
@@ -138,7 +208,7 @@ namespace nbuBackend {
         file << text.rdbuf();
     }
 
-    std::string CodeGen::WordType(int byteSize) {
+    std::string WordType(int byteSize) {
         switch (byteSize) {
             case 1:
                 return "byte";
