@@ -266,6 +266,7 @@ namespace nbuFrontend {
                 if (n.callParameters.size() != func.paramType.size()) {
                     print_error("The function "+func.name+" only take "+std::to_string(func.paramType.size())+" arguments but "+std::to_string(n.callParameters.size())+" where given");
                 }
+                n.retType = func.retType;
                 for (unsigned int i = 0; i < func.paramType.size() && i < n.callParameters.size(); ++i) {
                     const ASTNode* param = n.callParameters[i];
                     Type& type = func.paramType[i];

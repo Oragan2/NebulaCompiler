@@ -90,6 +90,7 @@ namespace nbuFrontend {
     struct FuncCallStmtNode {
         std::string name;
         std::vector<ASTNode*> callParameters;
+        Type retType;
     };
 
     struct VariableModNode {

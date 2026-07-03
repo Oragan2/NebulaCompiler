@@ -1,0 +1,43 @@
+#ifndef IRTRANSLATOR_H
+#define IRTRANSLATOR_H
+
+#include <vector>
+#include "../../nbu_frontend/type/type.h"
+#include "../../nbu_frontend/parser/parser.h"
+#include "../ir/ir.h"
+
+namespace nbuIR {
+    class IRTranslator {
+        public:
+        IRTranslator(const std::vector<nbuFrontend::ASTNode>& nodes);
+        void Translate();
+
+        private:
+        void TranslateStmt(const nbuFrontend::FuncStmtNode& n);
+        void TranslateStmt(const nbuFrontend::IfStmtNode& n);
+        void TranslateStmt(const nbuFrontend::BlockStmtNode& n);
+        void TranslateStmt(const nbuFrontend::ReturnStmtNode& n);
+
+        Val TranslateExpr(const nbuFrontend::ASTNode& n);
+
+        Val makeTemp(const nbuFrontend::Type& t);
+
+        void emitBinary(nbuFrontend::TokenType op, const Val& dst, const Val& lf, const Val& rf);
+        void emitDeclaration(const Val& dst, const Val& lf);
+        void emitUnary(nbuFrontend::TokenType op, const Val& dst, const Val& lf);
+        void emitCall(const Val& func, const Val& ret, std::vector<Val> params);
+        void emitAssign(const Val& var, const Val& lf);
+        void emitConv(const Val& dst, const Val& lf);
+        void emitRead(const Val& dst, const Val& lf);
+        void emitWrite(const Val& dst, const Val& lf);
+        
+        IRTranslator();
+        const std::vector<nbuFrontend::ASTNode>& nodes;
+        IRProgram prog;
+        IRFunction* currentFunc = nullptr;
+        IRBlock* currentBlock = nullptr;
+        unsigned int tempCounter = 0;
+        unsigned int blockCounter = 0;
+    };
+}
+#endif
