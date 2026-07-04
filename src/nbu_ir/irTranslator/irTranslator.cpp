@@ -2,12 +2,13 @@
 #include <cstdint>
 #include <string>
 #include "irTranslator.h"
+#include <algorithm>
 
 template<class... Ts> struct overloads : Ts... { using Ts::operator()...; };
 template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 
 namespace nbuIR {
-    IRTranslator::IRTranslator(const std::vector<nbuFrontend::ASTNode>& nodes) : nodes{nodes} {} 
+    IRTranslator::IRTranslator(const std::vector<nbuFrontend::ASTNode>& nodes, std::unordered_map<std::string, nbuFrontend::StructTypeInfo>& structs, std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums) : nodes{nodes}, structs{structs}, enums{enums} {} 
 
     void IRTranslator::Translate() {
         for (const auto& n : nodes) {
@@ -134,6 +135,17 @@ namespace nbuIR {
                 Val lf = TranslateExpr(*n.value);
                 emitWrite(dst, lf);
                 return dst;
+            },
+            [&](const nbuFrontend::asmNode& n) { return makeTemp(nbuFrontend::Type{nbuFrontend::Type::Kind::UINT32});}, // will find implementation later
+            [&](const nbuFrontend::EnumAccessNode& n) {
+                Val val(static_cast<int64_t>(enums[n.enumName+"::"+n.enumMember].raw_value), enums[n.enumName+"::"+n.enumMember].backing_type);
+                return val;
+            },
+            [&](const nbuFrontend::StructAccessNode& n) {
+                nbuFrontend::StructTypeInfo& info = structs[n.baseType.name];
+                auto& field = *std::find(info.fields.begin(), info.fields.end(), nbuFrontend::StructField{n.fieldName});
+                Val val(field.name, Val::Type::LOC);
+                return val;
             },
             [&](const auto& n) {return makeTemp(nbuFrontend::Type{nbuFrontend::Type::Kind::INT32});}
         },n);

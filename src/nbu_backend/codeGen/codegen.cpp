@@ -377,13 +377,11 @@ namespace nbuBackend {
             },
             [&](const nbuFrontend::StructAccessNode& n) {
                 std::string name = getFlatKey(*n.firstPart);
-                Register reg = (structs[name].fields[n.fieldName] == nbuFrontend::Type{nbuFrontend::Type::Kind::FLOAT32} || structs[name].fields[n.fieldName] == nbuFrontend::Type{nbuFrontend::Type::Kind::FLOAT32}) ? Register::XMM0 : Register::A;
                 std::string src = "dword [rbp" + std::to_string(localOffsetMap[name+"."+n.fieldName]) + "]";
                 MemoryOperand mem;
                 mem.baseReg = Register::RSP;
                 mem.globalLabel = name+"."+n.fieldName;
                 mem.offset = localOffsetMap[name+"."+n.fieldName];
-                emit(Op::MOV,reg,mem);
                 emitComment(name+"."+n.fieldName);
             },
             [&](const nbuFrontend::Int32LiteralNode& n) {
@@ -441,16 +439,16 @@ namespace nbuBackend {
 
     std::string CodeGen::getFlatKey(const nbuFrontend::ASTNode& node) {
         return std::visit(overloads {
-        [&](const nbuFrontend::VariableAccessNode& var) {
-            return var.name;
-        },
-        [&](const nbuFrontend::StructAccessNode& sac) {
-            return getFlatKey(*sac.firstPart) + "." + sac.fieldName;
-        },
-        [&](const auto&) {
-            return std::string("");
-        }
-    }, node);
+            [&](const nbuFrontend::VariableAccessNode& var) {
+                return var.name;
+            },
+            [&](const nbuFrontend::StructAccessNode& sac) {
+                return getFlatKey(*sac.firstPart) + "." + sac.fieldName;
+            },
+            [&](const auto&) {
+                return std::string("");
+            }
+        }, node);
     }
 
     bool CodeGen::isConstant(const nbuFrontend::ASTNode& node) {

@@ -9,6 +9,7 @@
 #include <vector>
 #include <iostream>
 #include <string>
+#include <algorithm>
 
 template<class... Ts> struct overloads : Ts... { using Ts::operator()...; };
 template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
@@ -110,7 +111,7 @@ namespace nbuFrontend {
                     StructTypeInfo info;
                     for (const auto& [name,field] : n.fields) {
                         //codeSemanticAnalyses(*field);
-                        info.fields.emplace(name,field);
+                        info.fields.emplace_back(name,field);
                     }
                     globalStructRegistery.emplace(n.structName, info);
                 },
@@ -318,8 +319,9 @@ namespace nbuFrontend {
             [this](StructAccessNode& n) {
                 codeSemanticAnalyses(*n.firstPart);
                 Type base = type_precision(*n.firstPart);
+                n.baseType = base;
                 StructTypeInfo info = globalStructRegistery[base.name];
-                if (!info.fields.contains(n.fieldName)) {
+                if (std::find(info.fields.begin(), info.fields.end(),StructField{n.fieldName}) == info.fields.end()) {
                     print_error("Struct "+base.name+" doesn't have "+n.fieldName+" as a field");
                 }
             },
@@ -358,11 +360,10 @@ namespace nbuFrontend {
 
                 StructTypeInfo& info = globalStructRegistery.at(base.type.name);
 
-                auto& field = info.fields.at(n.fieldName);
+                auto& field = *std::find(info.fields.begin(), info.fields.end(), StructField{n.fieldName});
 
                 return SymboleInfo{
-                    field.kind,
-                    field.name,
+                    field.type,
                     0
                 };
             },
@@ -401,7 +402,7 @@ namespace nbuFrontend {
             [this](const StructAccessNode& n) {
                 Type base = type_precision(*n.firstPart);
                 StructTypeInfo info = globalStructRegistery[base.name];
-                return info.fields[n.fieldName];
+                return std::find(info.fields.begin(), info.fields.end(), StructField{n.fieldName})->type;
             },
             [this](const auto&) {print_error("Uh?"); return Type{.kind = Type::Kind::INT32};}
         }, node);

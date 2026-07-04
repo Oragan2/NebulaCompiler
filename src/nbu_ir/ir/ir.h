@@ -44,11 +44,11 @@ namespace nbuIR {
         nbuFrontend::Type valueType;
         Type type = Type::NONE;
         int64_t i = 0;
-        float f = 0;
+        double f = 0;
         std::string name;
 
         Val(int64_t n, nbuFrontend::Type t) : type{Type::CONST}, i{n}, valueType{t} {}
-        Val(float n, nbuFrontend::Type t) : type{Type::CONST}, f{n}, valueType{t} {}
+        Val(double n, nbuFrontend::Type t) : type{Type::CONST}, f{n}, valueType{t} {}
         Val(const std::string& v, Type type, nbuFrontend::Type t={}) : type{type}, name{v}, valueType{t} {}
         Val() {}
     };

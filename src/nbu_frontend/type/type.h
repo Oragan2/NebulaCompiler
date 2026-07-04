@@ -46,8 +46,17 @@ namespace nbuFrontend {
         Type backing_type;
     };
 
+    struct StructField {
+        std::string name;
+        Type type;
+    };
+
+    inline bool operator==(StructField f1, StructField f2) {
+        return f1.name == f2.name;
+    }
+
     struct StructTypeInfo {
-        std::unordered_map<std::string, Type> fields;
+        std::vector<StructField> fields;
     };
 
     class ArenaAllocator {
