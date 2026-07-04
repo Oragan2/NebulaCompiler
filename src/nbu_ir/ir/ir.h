@@ -1,6 +1,7 @@
 #ifndef IR_H
 #define IR_H
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -8,32 +9,45 @@
 
 namespace nbuIR {
     enum class Op {
-    ADD,
-    SUB,
-    MUL,
-    DIV,
+        ADD,
+        SUB,
+        MUL,
+        DIV,
 
-    AND,
-    OR,
-    XOR,
-    NOT,
+        AND,
+        OR,
+        XOR,
+        NOT,
 
-    MOV,
+        MOV,
 
-    LOAD,
-    STORE,
+        LOAD,
+        STORE,
 
-    CMP,
+        CMP,
 
-    JMP,
-    JZ,
-    JNZ,
+        JMP,
+        JZ,
+        JNZ,
 
-    CALL,
-    RET,
+        CALL,
+        RET,
 
-    CAST
-};
+        CAST
+    };
+
+    enum class Type {
+        I8,
+        I16,
+        I32,
+        I64,        
+        U8,
+        U16,
+        U32,
+        U64,
+        F32,
+        F64
+    };
 
     struct Val {
         enum class Type {
@@ -45,15 +59,15 @@ namespace nbuIR {
         Type type = Type::NONE;
         int64_t i = 0;
         double f = 0;
-        std::string name;
-
+        nbuFrontend::SymboleInfo info;
+        size_t id;
         Val(int64_t n, nbuFrontend::Type t) : type{Type::CONST}, i{n}, valueType{t} {}
         Val(double n, nbuFrontend::Type t) : type{Type::CONST}, f{n}, valueType{t} {}
-        Val(const std::string& v, Type type, nbuFrontend::Type t={}) : type{type}, name{v}, valueType{t} {}
+        Val(const nbuFrontend::SymboleInfo* info, Type type, nbuFrontend::Type t={}) : type{type}, valueType{t}, info{*info} {}
         Val() {}
     };
 
-    Val makeTemp();
+    Val makeLable(size_t id);
 
     struct IRInst {
         Op op;

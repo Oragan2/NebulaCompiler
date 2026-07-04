@@ -25,7 +25,7 @@ namespace nbuFrontend {
         {"void", Type{Type::Kind::VOID}}
     };
 
-    std::unordered_map<Type::Kind, char> typeSize {
+    std::unordered_map<Type::Kind, size_t> typeSize {
         {Type::Kind::INT32, 4},
         {Type::Kind::UINT32, 4},
         {Type::Kind::INT64, 8},

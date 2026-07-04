@@ -32,13 +32,17 @@ namespace nbuFrontend {
 
     struct SymboleInfo {
         Type type;
-        unsigned stack_offset;
+        size_t stackOffset;
+        std::string name;
+        bool isGlobal;
+        size_t size;
     };
 
     struct FunctionInfo {
         std::string name;
         Type retType;
         std::vector<Type> paramType;
+        size_t id;
     };
 
     struct EnumVariantInfo {
@@ -49,6 +53,7 @@ namespace nbuFrontend {
     struct StructField {
         std::string name;
         Type type;
+        size_t offset;
     };
 
     inline bool operator==(StructField f1, StructField f2) {
@@ -90,7 +95,7 @@ namespace nbuFrontend {
 
     extern ArenaAllocator arena;
     extern std::unordered_map<std::string, Type> typeTable;
-    extern std::unordered_map<Type::Kind, char> typeSize;
+    extern std::unordered_map<Type::Kind, size_t> typeSize;
 }
 
 #endif

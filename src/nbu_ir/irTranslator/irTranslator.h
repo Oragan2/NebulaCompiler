@@ -13,6 +13,7 @@ namespace nbuIR {
         void Translate();
 
         private:
+        void TranslateStmt(const nbuFrontend::ASTNode& n);
         void TranslateStmt(const nbuFrontend::FuncStmtNode& n);
         void TranslateStmt(const nbuFrontend::IfStmtNode& n);
         void TranslateStmt(const nbuFrontend::BlockStmtNode& n);
@@ -41,6 +42,7 @@ namespace nbuIR {
         IRBlock* currentBlock = nullptr;
         unsigned int tempCounter = 0;
         unsigned int blockCounter = 0;
+        unsigned int functionCounter = 0;
     };
 }
 #endif

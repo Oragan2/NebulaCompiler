@@ -1,4 +1,5 @@
 #include "ir.h"
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include "irTranslator.h"
@@ -12,13 +13,21 @@ namespace nbuIR {
 
     void IRTranslator::Translate() {
         for (const auto& n : nodes) {
-            std::visit(overloads {
-                [&](const nbuFrontend::FuncStmtNode& n) {
-
-                },
-                [&](const auto& n) {}
-            },n);
+            TranslateStmt(n);
         }
+    }
+
+    void IRTranslator::TranslateStmt(const nbuFrontend::ASTNode& n) {
+        std::visit(overloads {
+            [&](const nbuFrontend::FuncStmtNode& node) {TranslateStmt(node);},
+            [&](const nbuFrontend::BlockStmtNode& node) {TranslateStmt(node);},
+            [&](const nbuFrontend::ReturnStmtNode& node) {TranslateStmt(node);},
+            [&](const nbuFrontend::IfStmtNode& node) {TranslateStmt(node);},
+            [&](const nbuFrontend::VariableDeclareNode& node) {
+
+            },
+            [&](const auto& n) {}
+        }, n);
     }
 
     void IRTranslator::TranslateStmt(const nbuFrontend::FuncStmtNode& n) {
@@ -26,20 +35,12 @@ namespace nbuIR {
         IRFunction& func = prog.functions.back();
         func.name = n.name;
         currentFunc = &func;
+        TranslateStmt(*n.code);
     }
 
     void IRTranslator::TranslateStmt(const nbuFrontend::IfStmtNode& n) {
         IRBlock& ifBlock = currentFunc->block.emplace_back();
-        IRBlock* elseBlock = nullptr;
-        if (n.elseNode != nullptr) elseBlock = &currentFunc->block.emplace_back();
-        IRBlock& endBlock = currentFunc->block.emplace_back();
-
-        ifBlock.label = "IF_" + std::to_string(blockCounter);
-        if (n.elseNode != nullptr) elseBlock->label = "ELSE_" + std::to_string(blockCounter);
-        endBlock.label = "END_" + std::to_string(blockCounter);
-
-        // will do the thingies later
-        ++blockCounter;
+        
     }
 
     void IRTranslator::TranslateStmt(const nbuFrontend::BlockStmtNode& n) {
@@ -70,12 +71,12 @@ namespace nbuIR {
                 Val lf;
                 if (n.info != nullptr)
                     lf = TranslateExpr(*n.info);
-                Val dst(n.name, Val::Type::LOC, n.type);
+                Val dst(&n.vInfo, Val::Type::LOC, n.type);
                 emitDeclaration(dst, lf);
                 return dst;
             },
             [&](const nbuFrontend::VariableAccessNode& n) {
-                return Val(n.name, Val::Type::LOC, n.precision); // will be changed since I currently don't know how to differenciate between glob and local
+                return Val(&n.info, Val::Type::LOC, n.precision);
             },
             [&](const nbuFrontend::UnaryOpNode& n) {
                 Val lf = TranslateExpr(*n.operand);
@@ -91,7 +92,7 @@ namespace nbuIR {
                         params.push_back(TranslateExpr(*par));
                 }
 
-                Val func = Val(n.name, Val::Type::LAB);
+                Val func = makeLable(n.id);
                 Val ret = makeTemp(n.retType);
                 emitCall(func, ret, std::move(params));
                 return ret;
@@ -144,15 +145,26 @@ namespace nbuIR {
             [&](const nbuFrontend::StructAccessNode& n) {
                 nbuFrontend::StructTypeInfo& info = structs[n.baseType.name];
                 auto& field = *std::find(info.fields.begin(), info.fields.end(), nbuFrontend::StructField{n.fieldName});
-                Val val(field.name, Val::Type::LOC);
-                return val;
+                Val base = TranslateExpr(*n.firstPart); // not used currently
+                return makeTemp(nbuFrontend::Type{nbuFrontend::Type::Kind::INT32}); // tmp
             },
             [&](const auto& n) {return makeTemp(nbuFrontend::Type{nbuFrontend::Type::Kind::INT32});}
         },n);
     }
 
     Val IRTranslator::makeTemp(const nbuFrontend::Type& t) {
-        return Val("t"+std::to_string(tempCounter++),Val::Type::TEMP,t);
+        Val ret;
+        ret.id = tempCounter++;
+        ret.type = Val::Type::TEMP;
+        ret.valueType = t;
+        return ret;
+    }
+
+    Val makeLable(size_t id) {
+        Val ret;
+        ret.id = id;
+        ret.type = Val::Type::LAB;
+        return ret;
     }
 
     void IRTranslator::emitBinary(nbuFrontend::TokenType op, const Val& dst, const Val& lf, const Val& rf) {

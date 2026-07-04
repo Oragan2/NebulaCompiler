@@ -224,17 +224,17 @@ namespace nbuBackend {
     }
 
     void CodeGen::fieldPrint(const nbuFrontend::StructTypeInfo& info, nbuFrontend::Type type, std::string name) {
-        for (const auto& [fieldName, field] : info.fields) {
-            if (field.kind != nbuFrontend::Type::Kind::STRUCT) {
-                int offset = localOffsetMap[name + fieldName];
+        for (const auto& infoF : info.fields) {
+            if (infoF.type.kind != nbuFrontend::Type::Kind::STRUCT) {
+                int offset = localOffsetMap[name + infoF.name];
                 MemoryOperand mem;
-                mem.globalLabel = name+fieldName;
+                mem.globalLabel = name+infoF.name;
                 mem.offset = offset;
                 emit(Op::MOV, mem, 0);
-                emitComment(name+fieldName+" "+std::to_string(offset));
+                emitComment(name+infoF.name+" "+std::to_string(offset));
             }
             else {
-                fieldPrint(info,field, name+fieldName+".");
+                fieldPrint(info,infoF.type, name+infoF.name+".");
             }
         }
     }

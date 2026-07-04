@@ -52,7 +52,7 @@ namespace nbuFrontend {
         for (ASTNode& node : nodes) {
             std::visit(overloads {
                 [this](VariableDeclareNode& n) {
-                    globalSymbolTable.emplace(n.name, SymboleInfo{.type = n.type, .stack_offset = 0});
+                    globalSymbolTable.emplace(n.name, SymboleInfo{.type = n.type, .stackOffset = 0, .name = n.name, .isGlobal = true, .size = typeSize[n.type.kind]});
                     if (n.info != nullptr) {
                         codeSemanticAnalyses(*n.info);
                         Type retType = type_precision(*n.info);
@@ -94,6 +94,7 @@ namespace nbuFrontend {
                         print_error("Function supposed to return a "+n.retType+" but doesn't return anything");
                     }
                     scopeStack.pop_back();
+                    offset = 0;
                 },
                 [this](const EnumDeclNode& n) {
                     size_t max_value = 0;
@@ -109,9 +110,13 @@ namespace nbuFrontend {
                 },
                 [this](const StructDeclNode& n) {
                     StructTypeInfo info;
+                    int localOffset = 0;
                     for (const auto& [name,field] : n.fields) {
-                        //codeSemanticAnalyses(*field);
-                        info.fields.emplace_back(name,field);
+                        if (field != Type{Type::Kind::STRUCT})
+                            localOffset += typeSize[field.kind];
+                        else
+                            localOffset += structSize(field);
+                        info.fields.emplace_back(name,field,localOffset);
                     }
                     globalStructRegistery.emplace(n.structName, info);
                 },
@@ -123,7 +128,7 @@ namespace nbuFrontend {
 
         return {errorNumber, warningNumber};
     }
-
+    
     bool Semantic::hasReturn(const ASTNode& n) {
         return std::visit(overloads{
             [this](const ReturnStmtNode& n) {
@@ -191,7 +196,8 @@ namespace nbuFrontend {
                 if (scopeStack.back().contains(n.name)) {
                     print_error("Variable "+n.name+" was already declared somewhere else");
                 }
-                scopeStack.back().emplace(n.name, SymboleInfo{n.type, 0});
+                offset += typeSize[n.type.kind];
+                scopeStack.back().emplace(n.name, SymboleInfo{n.type, offset});
                 if (n.info != nullptr) {
                     codeSemanticAnalyses(*n.info);
                     Type retType = type_precision(*n.info);
@@ -209,10 +215,14 @@ namespace nbuFrontend {
                 for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
                     if (it->contains(n.name) || globalSymbolTable.contains(n.name)) {
                         found = 1;
-                        if (it->contains(n.name))
+                        if (it->contains(n.name)) {
                             n.precision = it->at(n.name).type;
-                        else
+                            n.info = it->at(n.name);
+                        }
+                        else {
                             n.precision = globalSymbolTable[n.name].type;
+                            n.info = globalSymbolTable[n.name];
+                        }
                     }
                 }
                 if (!found) {
@@ -280,6 +290,7 @@ namespace nbuFrontend {
                         n.callParameters[i] = arena.allocate<ASTNode>(PromotionNode{promote, paramType, n.callParameters[i]});
                     } 
                 }
+                n.id = func.id;
             },
             [this](VariableModNode& n) {
                 codeSemanticAnalyses(*n.variable);
@@ -324,6 +335,7 @@ namespace nbuFrontend {
                 if (std::find(info.fields.begin(), info.fields.end(),StructField{n.fieldName}) == info.fields.end()) {
                     print_error("Struct "+base.name+" doesn't have "+n.fieldName+" as a field");
                 }
+                n.info = *std::find(info.fields.begin(), info.fields.end(),StructField{n.fieldName});
             },
             [this](StructDeclNode& n) {
                 print_error("Can't declare an enum inside a function"); // will maybe be changed later though probably not

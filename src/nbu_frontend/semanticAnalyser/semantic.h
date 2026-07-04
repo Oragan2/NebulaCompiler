@@ -28,6 +28,7 @@ namespace nbuFrontend {
         FunctionInfo currentFunc;
         unsigned int errorNumber = 0;
         unsigned int warningNumber = 0;
+        unsigned int offset = 0;
 
         void codeSemanticAnalyses(ASTNode& node);
         Type type_precision(const ASTNode& node);
@@ -37,6 +38,7 @@ namespace nbuFrontend {
         bool hasReturn(const ASTNode& n);
         void print_error(const std::string& msg);
         void print_warning(const std::string& msg);
+        size_t structSize(Type struc);
     };
 }
 

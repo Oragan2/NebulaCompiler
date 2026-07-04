@@ -57,12 +57,14 @@ namespace nbuFrontend {
         std::string name;
         Type type;
         ASTNode* info;
+        SymboleInfo vInfo;
     };
 
     struct VariableAccessNode {
         std::string name; 
         Type precision;
-    }; //Temp implementation will be changed later
+        SymboleInfo info;
+    };
 
     struct UnaryOpNode {
         TokenType op;
@@ -91,12 +93,14 @@ namespace nbuFrontend {
         std::string name;
         std::vector<ASTNode*> callParameters;
         Type retType;
+        size_t id;
     };
 
     struct VariableModNode {
         ASTNode* variable;
         ASTNode* info;
         Type precision;
+        SymboleInfo vInfo;
     };
 
     struct PromotionNode {
@@ -139,6 +143,7 @@ namespace nbuFrontend {
         Type baseType;
         ASTNode* firstPart;
         std::string fieldName;
+        StructField info;
     };
 
     enum Precedence {
