@@ -59,11 +59,11 @@ namespace nbuIR {
         Type type = Type::NONE;
         int64_t i = 0;
         double f = 0;
-        nbuFrontend::SymboleInfo info;
+        size_t offset;
         size_t id;
         Val(int64_t n, nbuFrontend::Type t) : type{Type::CONST}, i{n}, valueType{t} {}
         Val(double n, nbuFrontend::Type t) : type{Type::CONST}, f{n}, valueType{t} {}
-        Val(const nbuFrontend::SymboleInfo* info, Type type, nbuFrontend::Type t={}) : type{type}, valueType{t}, info{*info} {}
+        Val(size_t offset, Type type, nbuFrontend::Type t={}) : type{type}, valueType{t}, offset{offset} {}
         Val() {}
     };
 

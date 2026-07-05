@@ -110,14 +110,7 @@ namespace nbuFrontend {
                 },
                 [this](const StructDeclNode& n) {
                     StructTypeInfo info;
-                    int localOffset = 0;
-                    for (const auto& [name,field] : n.fields) {
-                        if (field != Type{Type::Kind::STRUCT})
-                            localOffset += typeSize[field.kind];
-                        else
-                            localOffset += structSize(field);
-                        info.fields.emplace_back(name,field,localOffset);
-                    }
+                    structSize(info);
                     globalStructRegistery.emplace(n.structName, info);
                 },
                 [this](const auto& n) {
@@ -127,6 +120,33 @@ namespace nbuFrontend {
         }
 
         return {errorNumber, warningNumber};
+    }
+
+    void Semantic::structSize(StructTypeInfo& info) {
+        size_t ret = 0;
+        size_t maxAlignment = 1;
+        for (auto& field : info.fields) {
+            size_t size;
+            size_t alignment;
+            if (field.type != Type{Type::Kind::STRUCT}) {
+                size = typeSize[field.type.kind];
+                alignment = size;
+            }
+            else {
+                const StructTypeInfo& infoOther = globalStructRegistery[field.type.name];
+                size = infoOther.size;
+                alignment = infoOther.alignment;
+            }
+            maxAlignment = std::max(maxAlignment, alignment);
+            
+            ret = (ret + alignment - 1) & ~(alignment - 1);
+            field.offset = ret;
+            ret += size;
+        }
+
+        ret = (ret + maxAlignment - 1) & ~(maxAlignment - 1);
+        info.alignment = maxAlignment;
+        info.size = ret;
     }
     
     bool Semantic::hasReturn(const ASTNode& n) {
@@ -196,8 +216,19 @@ namespace nbuFrontend {
                 if (scopeStack.back().contains(n.name)) {
                     print_error("Variable "+n.name+" was already declared somewhere else");
                 }
-                offset += typeSize[n.type.kind];
+                size_t size;
+                size_t alignment;
+                if (n.type.kind != Type::Kind::STRUCT) {
+                    size = typeSize[n.type.kind];
+                    alignment = size;
+                }
+                else {
+                    size = globalStructRegistery[n.type.name].size;
+                    alignment = globalStructRegistery[n.type.name].alignment;
+                }
+                offset = (offset + alignment - 1) & ~(alignment - 1);
                 scopeStack.back().emplace(n.name, SymboleInfo{n.type, offset});
+                offset += size;
                 if (n.info != nullptr) {
                     codeSemanticAnalyses(*n.info);
                     Type retType = type_precision(*n.info);
@@ -331,11 +362,17 @@ namespace nbuFrontend {
                 codeSemanticAnalyses(*n.firstPart);
                 Type base = type_precision(*n.firstPart);
                 n.baseType = base;
-                StructTypeInfo info = globalStructRegistery[base.name];
-                if (std::find(info.fields.begin(), info.fields.end(),StructField{n.fieldName}) == info.fields.end()) {
+                const StructTypeInfo& info = globalStructRegistery[base.name];
+                auto it = std::find(
+                    info.fields.begin(),
+                    info.fields.end(),
+                    StructField{n.fieldName}
+                );
+                if (it == info.fields.end()) {
                     print_error("Struct "+base.name+" doesn't have "+n.fieldName+" as a field");
                 }
-                n.info = *std::find(info.fields.begin(), info.fields.end(),StructField{n.fieldName});
+                n.info = *it;
+                n.finalType = it->type;
             },
             [this](StructDeclNode& n) {
                 print_error("Can't declare an enum inside a function"); // will maybe be changed later though probably not

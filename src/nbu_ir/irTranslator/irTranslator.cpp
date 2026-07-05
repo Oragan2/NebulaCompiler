@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 #include "irTranslator.h"
-#include <algorithm>
 
 template<class... Ts> struct overloads : Ts... { using Ts::operator()...; };
 template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
@@ -24,7 +23,6 @@ namespace nbuIR {
             [&](const nbuFrontend::ReturnStmtNode& node) {TranslateStmt(node);},
             [&](const nbuFrontend::IfStmtNode& node) {TranslateStmt(node);},
             [&](const nbuFrontend::VariableDeclareNode& node) {
-
             },
             [&](const auto& n) {}
         }, n);
@@ -40,7 +38,7 @@ namespace nbuIR {
 
     void IRTranslator::TranslateStmt(const nbuFrontend::IfStmtNode& n) {
         IRBlock& ifBlock = currentFunc->block.emplace_back();
-        
+        // will do later
     }
 
     void IRTranslator::TranslateStmt(const nbuFrontend::BlockStmtNode& n) {
@@ -68,15 +66,15 @@ namespace nbuIR {
                 return tmp;
             },
             [&](const nbuFrontend::VariableDeclareNode& n) {
-                Val lf;
-                if (n.info != nullptr)
-                    lf = TranslateExpr(*n.info);
-                Val dst(&n.vInfo, Val::Type::LOC, n.type);
-                emitDeclaration(dst, lf);
+                Val dst(n.vInfo.stackOffset, Val::Type::LOC, n.type);
+                if (n.info != nullptr) {
+                    Val lf = TranslateExpr(*n.info);
+                    emitDeclaration(dst, lf);
+                }
                 return dst;
             },
             [&](const nbuFrontend::VariableAccessNode& n) {
-                return Val(&n.info, Val::Type::LOC, n.precision);
+                return Val(n.info.stackOffset, Val::Type::LOC, n.precision);
             },
             [&](const nbuFrontend::UnaryOpNode& n) {
                 Val lf = TranslateExpr(*n.operand);
@@ -143,10 +141,19 @@ namespace nbuIR {
                 return val;
             },
             [&](const nbuFrontend::StructAccessNode& n) {
-                nbuFrontend::StructTypeInfo& info = structs[n.baseType.name];
-                auto& field = *std::find(info.fields.begin(), info.fields.end(), nbuFrontend::StructField{n.fieldName});
-                Val base = TranslateExpr(*n.firstPart); // not used currently
-                return makeTemp(nbuFrontend::Type{nbuFrontend::Type::Kind::INT32}); // tmp
+                Val base = TranslateExpr(*n.firstPart);
+
+                Val addr = makeTemp(nbuFrontend::Type{nbuFrontend::Type::Kind::UINT64});
+                emitBinary(
+                    nbuFrontend::TokenType::PLUS,
+                    addr,
+                    base,
+                    Val(static_cast<int64_t>(n.info.offset), nbuFrontend::Type{nbuFrontend::Type::Kind::INT32})
+                );
+
+                Val result = makeTemp(n.finalType);
+                emitRead(result, addr);
+                return result;
             },
             [&](const auto& n) {return makeTemp(nbuFrontend::Type{nbuFrontend::Type::Kind::INT32});}
         },n);

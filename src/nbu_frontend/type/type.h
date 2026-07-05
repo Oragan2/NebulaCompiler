@@ -62,6 +62,8 @@ namespace nbuFrontend {
 
     struct StructTypeInfo {
         std::vector<StructField> fields;
+        size_t size;
+        size_t alignment;
     };
 
     class ArenaAllocator {

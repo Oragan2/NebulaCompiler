@@ -38,7 +38,7 @@ namespace nbuFrontend {
         bool hasReturn(const ASTNode& n);
         void print_error(const std::string& msg);
         void print_warning(const std::string& msg);
-        size_t structSize(Type struc);
+        void structSize(StructTypeInfo& info);
     };
 }
 

@@ -141,6 +141,7 @@ namespace nbuFrontend {
     
     struct StructAccessNode {
         Type baseType;
+        Type finalType;
         ASTNode* firstPart;
         std::string fieldName;
         StructField info;
