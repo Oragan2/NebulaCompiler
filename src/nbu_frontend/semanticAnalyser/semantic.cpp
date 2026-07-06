@@ -34,7 +34,7 @@ namespace nbuFrontend {
         for (ASTNode& node : nodes) {
             std::visit(overloads {
                 [this](FuncStmtNode& n) {
-                    currentFunc = FunctionInfo{.name = n.name, .retType = n.retType};
+                    currentFunc = FunctionInfo{.name = n.name, .retType = n.retType, .id = functionCounter++};
                     for (ASTNode*& parameterNode : n.parameters) {
                         std::visit(overloads {
                             [this](VariableDeclareNode& n) {
@@ -43,7 +43,8 @@ namespace nbuFrontend {
                             [this](auto& n) {print_error("only variable declaration can be done in the function declaration"); }
                         },*parameterNode);
                     }
-                    functions.emplace(currentFunc.name, currentFunc);                    
+                    functions.emplace(currentFunc.name, currentFunc);      
+                    n.id = currentFunc.id;   
                 },
                 [this](auto& n) {}
             }, node);

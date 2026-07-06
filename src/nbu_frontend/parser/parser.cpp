@@ -240,7 +240,7 @@ namespace nbuFrontend {
                 consume(TokenType::DOT);
                 std::string fieldName = peek().val;
                 consume(TokenType::IDENTIFIER);
-                ret = StructAccessNode{Type{Type::Kind::INT32}, arena.allocate<ASTNode>(ret), fieldName};
+                ret = StructAccessNode{Type{Type::Kind::INT32},Type{Type::Kind::INT32}, arena.allocate<ASTNode>(ret), fieldName};
             }
             return ret;
         }

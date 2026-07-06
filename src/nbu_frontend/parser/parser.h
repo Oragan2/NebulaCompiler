@@ -87,6 +87,7 @@ namespace nbuFrontend {
         Type retType;
         std::vector<ASTNode*> parameters;
         ASTNode* code;
+        size_t id;
     };
 
     struct FuncCallStmtNode {

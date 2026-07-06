@@ -18,10 +18,11 @@ namespace nbuIR {
         void TranslateStmt(const nbuFrontend::IfStmtNode& n);
         void TranslateStmt(const nbuFrontend::BlockStmtNode& n);
         void TranslateStmt(const nbuFrontend::ReturnStmtNode& n);
+        void TranslateStmt(const nbuFrontend::writeAddrNode& n);
 
         Val TranslateExpr(const nbuFrontend::ASTNode& n);
 
-        Val makeTemp(const nbuFrontend::Type& t);
+        Val makeTemp(const Type& t);
 
         void emitBinary(nbuFrontend::TokenType op, const Val& dst, const Val& lf, const Val& rf);
         void emitDeclaration(const Val& dst, const Val& lf);
@@ -31,6 +32,7 @@ namespace nbuIR {
         void emitConv(const Val& dst, const Val& lf);
         void emitRead(const Val& dst, const Val& lf);
         void emitWrite(const Val& dst, const Val& lf);
+        void emitReturn(const Val& lf);
         
         IRTranslator();
         const std::vector<nbuFrontend::ASTNode>& nodes;

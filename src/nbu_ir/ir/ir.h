@@ -55,15 +55,15 @@ namespace nbuIR {
             LOC, GLO, CONST, TEMP,
             LAB
         };
-        nbuFrontend::Type valueType;
+        nbuIR::Type valueType;
         Type type = Type::NONE;
         int64_t i = 0;
         double f = 0;
         size_t offset;
         size_t id;
-        Val(int64_t n, nbuFrontend::Type t) : type{Type::CONST}, i{n}, valueType{t} {}
-        Val(double n, nbuFrontend::Type t) : type{Type::CONST}, f{n}, valueType{t} {}
-        Val(size_t offset, Type type, nbuFrontend::Type t={}) : type{type}, valueType{t}, offset{offset} {}
+        Val(int64_t n, nbuIR::Type t) : type{Type::CONST}, i{n}, valueType{t} {}
+        Val(double n, nbuIR::Type t) : type{Type::CONST}, f{n}, valueType{t} {}
+        Val(size_t offset, Type type, nbuIR::Type t={}) : type{type}, valueType{t}, offset{offset} {}
         Val() {}
     };
 
@@ -84,12 +84,14 @@ namespace nbuIR {
     };
 
     struct IRFunction {
-        std::string name;
-        std::vector<IRBlock> block;
+        size_t id;
+        std::vector<IRBlock> blocks;
     };
 
     struct IRProgram {
         std::vector<IRFunction> functions;
     };
+
+    Type toIRType(const nbuFrontend::Type& t);
 }
 #endif

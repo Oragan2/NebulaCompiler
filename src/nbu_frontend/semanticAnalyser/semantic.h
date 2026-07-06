@@ -29,6 +29,7 @@ namespace nbuFrontend {
         unsigned int errorNumber = 0;
         unsigned int warningNumber = 0;
         unsigned int offset = 0;
+        unsigned int functionCounter = 0;
 
         void codeSemanticAnalyses(ASTNode& node);
         Type type_precision(const ASTNode& node);
