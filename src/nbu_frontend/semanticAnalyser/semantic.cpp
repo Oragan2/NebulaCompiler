@@ -226,6 +226,11 @@ namespace nbuFrontend {
                     size = typeSize[n.type.kind];
                     alignment = size;
                 }
+                else if (n.type.kind == Type::Kind::ENUM) {
+		    size = typeSize[globalEnumRegistry[n.type.name].backing_type.kind];
+		    alignment = size;
+		    n.type = globalEnumRegistry[n.type.name].backing_type;
+		}
                 else {
                     size = globalStructRegistery[n.type.name].size;
                     alignment = globalStructRegistery[n.type.name].alignment;

@@ -1,4 +1,3 @@
-float32 cart = 12.2;
 
 uint32 test(uint32 i)
     return i+1;
@@ -43,8 +42,6 @@ int32 main() {
     vaddr data = 123;
     write32(data,32);
     x = read32(data);
-    cart = 13.3;
-    float32 d = cart+12.0;
     asm {
         xor rax, rax
     }
