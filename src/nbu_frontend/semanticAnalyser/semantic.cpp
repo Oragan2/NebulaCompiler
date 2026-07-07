@@ -457,6 +457,9 @@ namespace nbuFrontend {
                 StructTypeInfo info = globalStructRegistery[base.name];
                 return std::find(info.fields.begin(), info.fields.end(), StructField{n.fieldName})->type;
             },
+            [this](const PromotionNode& n) {
+                return n.topromote;
+            },
             [this](const auto&) {print_error("Uh?"); return Type{.kind = Type::Kind::INT32};}
         }, node);
     }

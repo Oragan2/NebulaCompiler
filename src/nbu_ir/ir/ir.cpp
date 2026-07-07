@@ -1,4 +1,5 @@
 #include "ir.h"
+#include <string>
 
 namespace nbuIR {
     Type toIRType(const nbuFrontend::Type& t)
@@ -21,8 +22,151 @@ namespace nbuIR {
             case nbuFrontend::Type::Kind::VADDR:   return Type::U64;
             case nbuFrontend::Type::Kind::PADDR:   return Type::U64;
 
-            default:
-                throw std::runtime_error("Unsupported type");
+            case nbuFrontend::Type::Kind::VOID:    return Type::V;
+
+            default: 
+                throw std::runtime_error("Unsupported type "+nbuFrontend::type_to_str(t));
+        }
+    }
+
+    std::string irProgramToStr(const IRProgram &prog) {
+        std::string ret;
+        for (const auto& func : prog.functions) 
+            ret += irFunctionToStr(func)+"\n";
+        return ret;
+    }
+
+    std::string irFunctionToStr(const IRFunction &func) {
+        std::string ret;
+        ret += "f"+std::to_string(func.id)+"\n";
+        for (const auto& block : func.blocks)
+            ret += irBlockToStr(block)+"\n";
+        return ret;
+    }
+
+    std::string irBlockToStr(const IRBlock &block) {
+        std::string ret;
+        ret += block.label+":";
+        for (const auto& inst : block.instructions)
+            ret += "\t"+irInstToStr(inst)+"\n";
+        return ret;
+    }
+
+    std::string irInstToStr(const IRInst &instruct) {
+        std::string ret;
+        ret += opToStr(instruct.op);
+        ret += " "+valToStr(instruct.dst);
+        ret += " "+valToStr(instruct.lf);
+        ret += " "+valToStr(instruct.rf);
+        for (int i = 0; instruct.args.size() > i; ++i) {
+            ret += " "+valToStr(instruct.args[i]);
+        }
+        return ret;
+    }
+
+    std::string opToStr(const Op &op) {
+        switch (op) {
+            case Op::ADD:
+                return "add";
+            case Op::SUB:
+                return "sub";
+            case Op::MUL:
+                return "mul";
+            case Op::DIV:
+                return "div";
+            case Op::AND:
+                return "and";
+            case Op::OR:
+                return "or";
+            case Op::XOR:
+                return "xor";
+            case Op::NOT:
+                return "not";
+            case Op::MOV:
+                return "mov";
+            case Op::LOAD:
+                return "load";
+            case Op::STORE:
+                return "store";
+            case Op::CMP:
+                return "cmp";
+            case Op::JMP:
+                return "jmp";
+            case Op::JZ:
+                return "jz";
+            case Op::JNZ:
+                return "jnz";
+            case Op::CALL:
+                return "call";
+            case Op::RET:
+                return "ret";
+            case Op::CAST:
+                return "cast";
+        }
+    }
+
+    std::string valToStr(const Val &val) {
+        std::string ret;
+        switch (val.type) {
+            case Val::Type::NONE:
+                return "";
+            case Val::Type::LOC:
+                ret += std::to_string(val.offset);
+                ret += ":" + typeToStr(val.valueType);
+                ret += " ";
+                if (val.valueType != Type::F32 || val.valueType != Type::F64)
+                    ret += std::to_string(val.i);
+                else
+                    ret += std::to_string(val.f);
+                return ret;
+            case Val::Type::GLO:
+                return " not implemented and how did you get here given there are not supported yet in the IR";
+            case Val::Type::CONST:
+                ret += typeToStr(val.valueType);
+                ret += " ";
+                if (val.valueType != Type::F32 || val.valueType != Type::F64)
+                    ret += std::to_string(val.i);
+                else
+                    ret += std::to_string(val.f);
+                return ret;
+            case Val::Type::TEMP:
+                ret += "t"+std::to_string(val.id);
+                ret += ":"+typeToStr(val.valueType);
+                ret += " ";
+                if (val.valueType != Type::F32 || val.valueType != Type::F64)
+                    ret += std::to_string(val.i);
+                else
+                    ret += std::to_string(val.f);
+                return ret;
+            case Val::Type::LAB:
+                return std::to_string(val.id);
+        }
+    }
+
+    std::string typeToStr(const Type &type) {
+        switch (type) {
+            case Type::I8:
+                return "i8";
+            case Type::I16:
+                return "i16";
+            case Type::I32:
+                return "i32";
+            case Type::I64:
+                return "i64";
+            case Type::U8:
+                return "u8";
+            case Type::U16:
+                return "u16";
+            case Type::U32:
+                return "u32";
+            case Type::U64:
+                return "u64";
+            case Type::F32:
+                return "f32";
+            case Type::F64:
+                return "f64";
+            case Type::V:
+                return "void";
         }
     }
 }

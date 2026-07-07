@@ -46,7 +46,8 @@ namespace nbuIR {
         U32,
         U64,
         F32,
-        F64
+        F64,
+        V
     };
 
     struct Val {
@@ -55,12 +56,12 @@ namespace nbuIR {
             LOC, GLO, CONST, TEMP,
             LAB
         };
-        nbuIR::Type valueType;
+        nbuIR::Type valueType = nbuIR::Type::V;
         Type type = Type::NONE;
         int64_t i = 0;
         double f = 0;
-        size_t offset;
-        size_t id;
+        size_t offset = 0;
+        size_t id = 0;
         Val(int64_t n, nbuIR::Type t) : type{Type::CONST}, i{n}, valueType{t} {}
         Val(double n, nbuIR::Type t) : type{Type::CONST}, f{n}, valueType{t} {}
         Val(size_t offset, Type type, nbuIR::Type t={}) : type{type}, valueType{t}, offset{offset} {}
@@ -85,6 +86,7 @@ namespace nbuIR {
 
     struct IRFunction {
         size_t id;
+        Type retType;
         std::vector<IRBlock> blocks;
     };
 
@@ -93,5 +95,12 @@ namespace nbuIR {
     };
 
     Type toIRType(const nbuFrontend::Type& t);
+    std::string irInstToStr(const IRInst& instruct);
+    std::string irBlockToStr(const IRBlock& block);
+    std::string irFunctionToStr(const IRFunction& func);
+    std::string irProgramToStr(const IRProgram& prog);
+    std::string opToStr(const Op& op);
+    std::string valToStr(const Val& val);
+    std::string typeToStr(const Type& type);
 }
 #endif

@@ -1,6 +1,7 @@
 #include "ir.h"
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <string>
 #include "irTranslator.h"
 
@@ -8,12 +9,13 @@ template<class... Ts> struct overloads : Ts... { using Ts::operator()...; };
 template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 
 namespace nbuIR {
-    IRTranslator::IRTranslator(const std::vector<nbuFrontend::ASTNode>& nodes, std::unordered_map<std::string, nbuFrontend::StructTypeInfo>& structs, std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums) : nodes{nodes}, structs{structs}, enums{enums} {} 
+    IRTranslator::IRTranslator(const std::vector<nbuFrontend::ASTNode>& nodes, std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums) : nodes{nodes}, enums{enums} {} 
 
-    void IRTranslator::Translate() {
+    IRProgram IRTranslator::Translate() {
         for (const auto& n : nodes) {
             TranslateStmt(n);
         }
+        return prog;
     }
 
     void IRTranslator::TranslateStmt(const nbuFrontend::ASTNode& n) {
@@ -22,9 +24,9 @@ namespace nbuIR {
             [&](const nbuFrontend::BlockStmtNode& node) {TranslateStmt(node);},
             [&](const nbuFrontend::ReturnStmtNode& node) {TranslateStmt(node);},
             [&](const nbuFrontend::IfStmtNode& node) {TranslateStmt(node);},
-            [&](const nbuFrontend::VariableDeclareNode& node) {
-            },
-            [&](const auto& n) {}
+            [&](const nbuFrontend::writeAddrNode& node) {TranslateStmt(node);},
+            [&](const nbuFrontend::VariableDeclareNode& node) {TranslateStmt(node);},
+            [&](const auto& n) {TranslateExpr(n);}
         }, n);
     }
 
@@ -32,9 +34,11 @@ namespace nbuIR {
         prog.functions.emplace_back();
         IRFunction& func = prog.functions.back();
         func.id = n.id;
+        func.retType = toIRType(n.retType);
         currentFunc = &func;
         func.blocks.emplace_back();
         func.blocks.back().label = "entry";
+        currentBlock = &func.blocks.back();
         TranslateStmt(*n.code);
     }
 
@@ -63,7 +67,10 @@ namespace nbuIR {
     }
 
     void IRTranslator::TranslateStmt(const nbuFrontend::ReturnStmtNode& n) {
-
+        if (n.expression != nullptr)
+            emitReturn(TranslateExpr(*n.expression));
+        else
+            emitReturn(Val{});
     }
 
     void IRTranslator::TranslateStmt(const nbuFrontend::writeAddrNode& n) {
@@ -72,7 +79,18 @@ namespace nbuIR {
         emitWrite(dst, lf);
     }
 
+    void IRTranslator::TranslateStmt(const nbuFrontend::VariableDeclareNode& n) {
+        Val dst(n.vInfo.stackOffset, Val::Type::LOC, toIRType(n.type));
+        std::cout << "n.info = " << n.info << '\n';
+        std::cout << n.info->index() << '\n';
+        if (n.info != nullptr) {
+            Val lf = TranslateExpr(*n.info);
+            emitDeclaration(dst, lf);
+        }
+    }
+
     Val IRTranslator::TranslateExpr(const nbuFrontend::ASTNode& n) {
+        std::cout << "Entering TranslateExpr, index = " << n.index() << '\n';
         return std::visit(overloads {
             [&](const nbuFrontend::Int32LiteralNode& n) {
                 return Val(static_cast<int64_t>(n.value),Type::I32);
@@ -87,14 +105,6 @@ namespace nbuIR {
                 Val tmp = makeTemp(toIRType(n.precision));
                 emitBinary(n.op, tmp, lf, rf);
                 return tmp;
-            },
-            [&](const nbuFrontend::VariableDeclareNode& n) {
-                Val dst(n.vInfo.stackOffset, Val::Type::LOC, toIRType(n.type));
-                if (n.info != nullptr) {
-                    Val lf = TranslateExpr(*n.info);
-                    emitDeclaration(dst, lf);
-                }
-                return dst;
             },
             [&](const nbuFrontend::VariableAccessNode& n) {
                 return Val(n.info.stackOffset, Val::Type::LOC, toIRType(n.precision));
@@ -253,6 +263,8 @@ namespace nbuIR {
     }
 
     void IRTranslator::emitConv(const Val& dst, const Val& lf) {
+        std::cout << "currentBlock = " << currentBlock << '\n';
+        std::cout << "currentFunc = " << currentFunc << '\n';
         currentBlock->instructions.push_back(IRInst{Op::CAST, dst, lf});
     }
 

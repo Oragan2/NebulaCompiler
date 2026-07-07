@@ -1,6 +1,7 @@
 #include "../../nbu_frontend/parser/parser.h"
 #include "../../nbu_frontend/lexer/lexer.h"
 #include "../../nbu_frontend/semanticAnalyser/semantic.h"
+#include "ir.h"
 #include "type.h"
 #include "irTranslator.h"
 #include <cstdlib>
@@ -160,9 +161,11 @@ int main(int argc, char **argv) {
 
   //print_tree(semantic.getNodes());
    
-  nbuIR::IRTranslator irtranslator{semantic.getNodes(), semantic.getStruct(), semantic.getEnums()};
+  nbuIR::IRTranslator irtranslator{semantic.getNodes(), semantic.getEnums()};
 
-  irtranslator.Translate();
+  auto IR = irtranslator.Translate();
+  
+  std::cout << nbuIR::irProgramToStr(IR);
 
   std::ofstream outputFile("a.out");
 
