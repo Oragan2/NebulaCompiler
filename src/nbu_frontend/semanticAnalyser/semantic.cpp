@@ -111,6 +111,9 @@ namespace nbuFrontend {
                 },
                 [this](const StructDeclNode& n) {
                     StructTypeInfo info;
+                    for (const auto& [name, type] : n.fields) {
+                        info.fields.emplace_back(name, type);
+                    }
                     structSize(info);
                     globalStructRegistery.emplace(n.structName, info);
                 },
