@@ -26,7 +26,8 @@ namespace nbuIR {
         Val makeTemp(const Type& t);
 
         void emitBinary(nbuFrontend::TokenType op, const Val& dst, const Val& lf, const Val& rf);
-        void emitDeclaration(const Val& dst, const Val& lf);
+        void emitLocalDeclaration(const Val& dst, const Val& lf);
+        void emitGlobaleclaration(const Val& dst, const Val& lf=Val{});
         void emitUnary(nbuFrontend::TokenType op, const Val& dst, const Val& lf);
         void emitCall(const Val& func, const Val& ret, std::vector<Val> params);
         void emitAssign(const Val& var, const Val& lf);
@@ -34,6 +35,8 @@ namespace nbuIR {
         void emitRead(const Val& dst, const Val& lf);
         void emitWrite(const Val& dst, const Val& lf);
         void emitReturn(const Val& lf);
+        void emitJMP(const Val& lab);
+        void emitJE(const Val& lab);
         
         IRTranslator();
         const std::vector<nbuFrontend::ASTNode>& nodes;

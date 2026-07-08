@@ -54,10 +54,11 @@ namespace nbuIR {
         enum class Type {
             NONE,
             LOC, GLO, CONST, TEMP,
-            LAB
+            LABF, LABB
         };
         nbuIR::Type valueType = nbuIR::Type::V;
         Type type = Type::NONE;
+        std::string name;
         int64_t i = 0;
         double f = 0;
         size_t offset = 0;
@@ -65,10 +66,12 @@ namespace nbuIR {
         Val(int64_t n, nbuIR::Type t) : type{Type::CONST}, i{n}, valueType{t} {}
         Val(double n, nbuIR::Type t) : type{Type::CONST}, f{n}, valueType{t} {}
         Val(size_t offset, Type type, nbuIR::Type t={}) : type{type}, valueType{t}, offset{offset} {}
+        Val(std::string name, Type type, nbuIR::Type t={}) : type{type}, valueType{t}, name{name} {}
         Val() {}
     };
 
-    Val makeLable(size_t id);
+    Val makeFLable(size_t id);
+    Val makeBLable(const std::string& name);
 
     struct IRInst {
         Op op;
@@ -91,6 +94,7 @@ namespace nbuIR {
     };
 
     struct IRProgram {
+        std::vector<IRInst> globals;
         std::vector<IRFunction> functions;
     };
 

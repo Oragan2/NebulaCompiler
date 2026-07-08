@@ -1,7 +1,6 @@
 #include "ir.h"
 #include <cstddef>
 #include <cstdint>
-#include <iostream>
 #include <string>
 #include "irTranslator.h"
 
@@ -40,22 +39,31 @@ namespace nbuIR {
         func.blocks.back().label = "entry";
         currentBlock = &func.blocks.back();
         TranslateStmt(*n.code);
+        currentBlock = nullptr;
+        currentFunc = nullptr;
     }
 
     void IRTranslator::TranslateStmt(const nbuFrontend::IfStmtNode& n) {
+        int currentCounter = blockCounter++;
+        TranslateExpr(*n.condition);        
+        emitJE(makeBLable("IF_"+std::to_string(currentCounter)));
+        if (n.elseNode != nullptr)
+            emitJMP(makeBLable("ELSE_"+std::to_string(currentCounter)));
         IRBlock& ifBlock = currentFunc->blocks.emplace_back();
-        TranslateExpr(*n.condition);
-        ifBlock.label = "IF_"+std::to_string(blockCounter);
+        ifBlock.label = "IF_"+std::to_string(currentCounter);
         currentBlock = &ifBlock;
         TranslateStmt(*n.ifNode);
+        emitJMP(makeBLable("ENDIF_"+std::to_string(currentCounter)));
         if (n.elseNode != nullptr) {
             IRBlock& elseBlock = currentFunc->blocks.emplace_back();
+            emitJMP(makeBLable(elseBlock.label));
             currentBlock = &elseBlock;
-            elseBlock.label = "ELSE_"+std::to_string(blockCounter);
+            elseBlock.label = "ELSE_"+std::to_string(currentCounter);
             TranslateStmt(*n.elseNode);
+            emitJMP(makeBLable("ENDIF_"+std::to_string(currentCounter)));
         }
         IRBlock& endBlock = currentFunc->blocks.emplace_back();
-        endBlock.label = "ENDIF_"+std::to_string(blockCounter);
+        endBlock.label = "ENDIF_"+std::to_string(currentCounter);
         currentBlock = &endBlock;
         ++blockCounter;
     }
@@ -80,17 +88,24 @@ namespace nbuIR {
     }
 
     void IRTranslator::TranslateStmt(const nbuFrontend::VariableDeclareNode& n) {
-        Val dst(n.vInfo.stackOffset, Val::Type::LOC, toIRType(n.type));
-        std::cout << "n.info = " << n.info << '\n';
-        std::cout << n.info->index() << '\n';
+        Val dst;
+        if (n.vInfo.isGlobal)
+            dst = Val(n.vInfo.name, Val::Type::GLO, toIRType(n.type));
+        else
+            dst = Val(n.vInfo.stackOffset, Val::Type::LOC, toIRType(n.type));
         if (n.info != nullptr) {
-            Val lf = TranslateExpr(*n.info);
-            emitDeclaration(dst, lf);
+            Val lf = TranslateExpr(*n.info);    
+            if (currentBlock != nullptr) 
+                emitLocalDeclaration(dst, lf);
+            else 
+                emitGlobaleclaration(dst, lf);
+        }
+        else if (currentBlock == nullptr) {
+            emitGlobaleclaration(dst);
         }
     }
 
     Val IRTranslator::TranslateExpr(const nbuFrontend::ASTNode& n) {
-        std::cout << "Entering TranslateExpr, index = " << n.index() << '\n';
         return std::visit(overloads {
             [&](const nbuFrontend::Int32LiteralNode& n) {
                 return Val(static_cast<int64_t>(n.value),Type::I32);
@@ -107,7 +122,11 @@ namespace nbuIR {
                 return tmp;
             },
             [&](const nbuFrontend::VariableAccessNode& n) {
-                return Val(n.info.stackOffset, Val::Type::LOC, toIRType(n.precision));
+                if (n.info.isGlobal)
+                    return Val(n.info.name, Val::Type::GLO, toIRType(n.precision));
+                else
+                    return Val(n.info.stackOffset, Val::Type::LOC, toIRType(n.precision));
+
             },
             [&](const nbuFrontend::UnaryOpNode& n) {
                 Val lf = TranslateExpr(*n.operand);
@@ -123,7 +142,7 @@ namespace nbuIR {
                         params.push_back(TranslateExpr(*par));
                 }
 
-                Val func = makeLable(n.id);
+                Val func = makeFLable(n.id);
                 Val ret = makeTemp(toIRType(n.retType));
                 emitCall(func, ret, std::move(params));
                 return ret;
@@ -177,10 +196,7 @@ namespace nbuIR {
                     base,
                     Val(static_cast<int64_t>(n.info.offset), Type::I32)
                 );
-
-                Val result = makeTemp(toIRType(n.finalType));
-                emitRead(result, addr);
-                return result;
+                return addr;
             },
             [&](const auto& n) {return makeTemp(Type::I32);}
         },n);
@@ -194,10 +210,17 @@ namespace nbuIR {
         return ret;
     }
 
-    Val makeLable(size_t id) {
+    Val makeFLable(size_t id) {
         Val ret;
         ret.id = id;
-        ret.type = Val::Type::LAB;
+        ret.type = Val::Type::LABF;
+        return ret;
+    }
+
+    Val makeBLable(const std::string& name) {
+        Val ret;
+        ret.name = name;
+        ret.type = Val::Type::LABB;
         return ret;
     }
 
@@ -229,6 +252,9 @@ namespace nbuIR {
             case nbuFrontend::TokenType::NOT:
                 instOp = Op::NOT;
                 break;
+            case nbuFrontend::TokenType::EQUALEQUAL:
+                instOp = Op::CMP;
+                break;
             default:
                 instOp = Op::ADD;
         }
@@ -250,8 +276,12 @@ namespace nbuIR {
         currentBlock->instructions.push_back(IRInst{instOp, dst, lf});
     }
 
-    void IRTranslator::emitDeclaration(const Val& dst, const Val& lf) {
-        currentBlock->instructions.push_back(IRInst{Op::STORE, lf});
+    void IRTranslator::emitLocalDeclaration(const Val& dst, const Val& lf) {
+        currentBlock->instructions.push_back(IRInst{Op::STORE, dst, lf});
+    }
+
+    void IRTranslator::emitGlobaleclaration(const Val& dst, const Val& lf) {
+        prog.globals.push_back(IRInst{Op::STORE, dst, lf});
     }
 
     void IRTranslator::emitCall(const Val& func, const Val& ret, std::vector<Val> params) {
@@ -259,12 +289,10 @@ namespace nbuIR {
     }
 
     void IRTranslator::emitAssign(const Val& var, const Val& lf) {
-        currentBlock->instructions.push_back(IRInst{Op::MOV, var, lf});
+        currentBlock->instructions.push_back(IRInst{Op::STORE, var, lf});
     }
 
     void IRTranslator::emitConv(const Val& dst, const Val& lf) {
-        std::cout << "currentBlock = " << currentBlock << '\n';
-        std::cout << "currentFunc = " << currentFunc << '\n';
         currentBlock->instructions.push_back(IRInst{Op::CAST, dst, lf});
     }
 
@@ -278,5 +306,13 @@ namespace nbuIR {
 
     void IRTranslator::emitReturn(const Val& lf) {
         currentBlock->instructions.push_back(IRInst{Op::RET,Val{}, lf}); // tmp
+    }
+
+    void IRTranslator::emitJMP(const Val& lab) {
+        currentBlock->instructions.push_back(IRInst{Op::JMP, Val{}, lab});
+    }
+
+    void IRTranslator::emitJE(const Val& lab) {
+        currentBlock->instructions.push_back(IRInst{Op::JZ, Val{}, lab});
     }
 }

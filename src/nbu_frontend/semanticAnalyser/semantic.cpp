@@ -60,7 +60,7 @@ namespace nbuFrontend {
                         if (retType != n.type) {
                             Type promote = tryPromote(retType, n.type);
                             if (promote == retType) {
-                                print_error("The variable is a "+n.type+" but tryed to declare it a "+promote);
+                                print_error("The variable is a "+n.type+" but tried to declare it a "+promote);
                             }
                             n.info = arena.allocate<ASTNode>(PromotionNode{promote, retType, n.info});
                         }
@@ -72,7 +72,18 @@ namespace nbuFrontend {
                     for (ASTNode*& parameterNode : n.parameters) {
                         std::visit(overloads {
                             [this](VariableDeclareNode& n) {
-                                scopeStack.back().emplace(n.name, SymboleInfo{n.type, 0});
+                                size_t size;
+                                if (n.type.kind != Type::Kind::STRUCT) {
+                                    size = typeSize[n.type.kind];
+                                }
+                                else if (n.type.kind == Type::Kind::ENUM) {
+                                    size = typeSize[globalEnumRegistry[n.type.name].backing_type.kind];
+                                    n.type = globalEnumRegistry[n.type.name].backing_type;
+                                }
+                                else {
+                                    size = globalStructRegistery[n.type.name].size;
+                                }
+                                scopeStack.back().emplace(n.name, SymboleInfo{n.type, 0, n.name, true, size});
                                 if (n.info != nullptr) {
                                     codeSemanticAnalyses(*n.info);
                                     Type retType = type_precision(*n.info);
@@ -222,22 +233,23 @@ namespace nbuFrontend {
                 }
                 size_t size;
                 size_t alignment;
-                if (n.type.kind != Type::Kind::STRUCT) {
-                    size = typeSize[n.type.kind];
-                    alignment = size;
-                }
-                else if (n.type.kind == Type::Kind::ENUM) {
-		    size = typeSize[globalEnumRegistry[n.type.name].backing_type.kind];
-		    alignment = size;
-		    n.type = globalEnumRegistry[n.type.name].backing_type;
-		}
-                else {
+                if (n.type.kind == Type::Kind::STRUCT) {
                     size = globalStructRegistery[n.type.name].size;
                     alignment = globalStructRegistery[n.type.name].alignment;
                 }
+                else if (n.type.kind == Type::Kind::ENUM) {
+                    size = typeSize[globalEnumRegistry[n.type.name].backing_type.kind];
+                    alignment = size;
+                    n.type = globalEnumRegistry[n.type.name].backing_type;
+                }
+                else {
+                    size = typeSize[n.type.kind];
+                    alignment = size;
+                }
+                offset += size;
                 offset = (offset + alignment - 1) & ~(alignment - 1);
                 scopeStack.back().emplace(n.name, SymboleInfo{n.type, offset});
-                offset += size;
+                n.vInfo = scopeStack.back()[n.name];
                 if (n.info != nullptr) {
                     codeSemanticAnalyses(*n.info);
                     Type retType = type_precision(*n.info);

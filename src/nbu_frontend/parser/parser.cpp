@@ -109,7 +109,7 @@ namespace nbuFrontend {
             ASTNode addr = parse_expression(Precedence::LOWEST);
             if (info.val.find("read") != std::string::npos) {
                 readAddrNode ret;
-                ret.quantity = std::stoi(info.val.data()+4);
+                ret.quantity = std::stoi(info.val.data()+4)/8;
                 ret.addr = arena.allocate<ASTNode>(addr);
                 consume(TokenType::RPARAM);
                 consume(TokenType::SEMICOLON);
@@ -213,7 +213,7 @@ namespace nbuFrontend {
             ASTNode addr = parse_expression(Precedence::LOWEST);
             if (name.find("read") != std::string::npos) {
                 readAddrNode ret;
-                ret.quantity = std::stoi(name.data()+4);
+                ret.quantity = std::stoi(name.data()+4)/8;
                 ret.addr = arena.allocate<ASTNode>(addr);
                 consume(TokenType::RPARAM);
                 return ret;

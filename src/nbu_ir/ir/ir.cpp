@@ -24,6 +24,8 @@ namespace nbuIR {
 
             case nbuFrontend::Type::Kind::VOID:    return Type::V;
 
+            case nbuFrontend::Type::Kind::STRUCT: return Type::U64;
+
             default: 
                 throw std::runtime_error("Unsupported type "+nbuFrontend::type_to_str(t));
         }
@@ -46,7 +48,7 @@ namespace nbuIR {
 
     std::string irBlockToStr(const IRBlock &block) {
         std::string ret;
-        ret += block.label+":";
+        ret += block.label+":\n";
         for (const auto& inst : block.instructions)
             ret += "\t"+irInstToStr(inst)+"\n";
         return ret;
@@ -55,9 +57,9 @@ namespace nbuIR {
     std::string irInstToStr(const IRInst &instruct) {
         std::string ret;
         ret += opToStr(instruct.op);
-        ret += " "+valToStr(instruct.dst);
-        ret += " "+valToStr(instruct.lf);
-        ret += " "+valToStr(instruct.rf);
+        ret += ", "+valToStr(instruct.dst);
+        ret += ", "+valToStr(instruct.lf);
+        ret += ", "+valToStr(instruct.rf);
         for (int i = 0; instruct.args.size() > i; ++i) {
             ret += " "+valToStr(instruct.args[i]);
         }
@@ -102,6 +104,8 @@ namespace nbuIR {
                 return "ret";
             case Op::CAST:
                 return "cast";
+            default:
+                return "you forgot";
         }
     }
 
@@ -111,7 +115,7 @@ namespace nbuIR {
             case Val::Type::NONE:
                 return "";
             case Val::Type::LOC:
-                ret += std::to_string(val.offset);
+                ret += "LOC["+std::to_string(val.offset)+"]";
                 ret += ":" + typeToStr(val.valueType);
                 ret += " ";
                 if (val.valueType != Type::F32 || val.valueType != Type::F64)
@@ -120,15 +124,22 @@ namespace nbuIR {
                     ret += std::to_string(val.f);
                 return ret;
             case Val::Type::GLO:
-                return " not implemented and how did you get here given there are not supported yet in the IR";
-            case Val::Type::CONST:
-                ret += typeToStr(val.valueType);
+                ret += "GLO["+val.name+"]";
+                ret += ":" + typeToStr(val.valueType);
                 ret += " ";
                 if (val.valueType != Type::F32 || val.valueType != Type::F64)
                     ret += std::to_string(val.i);
                 else
                     ret += std::to_string(val.f);
                 return ret;
+            case Val::Type::CONST:
+                ret += typeToStr(val.valueType);
+                ret += " CONST(";
+                if (val.valueType != Type::F32 || val.valueType != Type::F64)
+                    ret += std::to_string(val.i);
+                else
+                    ret += std::to_string(val.f);
+                return ret+")";
             case Val::Type::TEMP:
                 ret += "t"+std::to_string(val.id);
                 ret += ":"+typeToStr(val.valueType);
@@ -138,8 +149,12 @@ namespace nbuIR {
                 else
                     ret += std::to_string(val.f);
                 return ret;
-            case Val::Type::LAB:
-                return std::to_string(val.id);
+            case Val::Type::LABF:
+                return "f"+std::to_string(val.id);
+            case Val::Type::LABB:
+                return val.name;
+            default:
+                return "You forgot";
         }
     }
 
@@ -167,6 +182,8 @@ namespace nbuIR {
                 return "f64";
             case Type::V:
                 return "void";
+            default:
+                return "you forgot";
         }
     }
 }
