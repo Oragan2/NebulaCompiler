@@ -49,6 +49,8 @@ namespace nbuIR {
         emitJE(makeBLable("IF_"+std::to_string(currentCounter)));
         if (n.elseNode != nullptr)
             emitJMP(makeBLable("ELSE_"+std::to_string(currentCounter)));
+        else
+            emitJMP(makeBLable("ENDIF_"+std::to_string(currentCounter)));
         IRBlock& ifBlock = currentFunc->blocks.emplace_back();
         ifBlock.label = "IF_"+std::to_string(currentCounter);
         currentBlock = &ifBlock;
@@ -93,7 +95,7 @@ namespace nbuIR {
             dst = Val(n.vInfo.name, Val::Type::GLO, toIRType(n.type));
         else
             dst = Val(n.vInfo.stackOffset, Val::Type::LOC, toIRType(n.type));
-        if (n.info != nullptr) {
+        if (n.info != nullptr && currentBlock != nullptr) {
             Val lf = TranslateExpr(*n.info);    
             if (currentBlock != nullptr) 
                 emitLocalDeclaration(dst, lf);
