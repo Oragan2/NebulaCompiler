@@ -1,210 +1,270 @@
 #include "ir.h"
-#include <cstddef>
-#include <cstdint>
 #include <string>
 #include "irTranslator.h"
 
-template<class... Ts> struct overloads : Ts... { using Ts::operator()...; };
-template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
+#include <ranges>
 
-namespace nbuIR {
-    IRTranslator::IRTranslator(const std::vector<nbuFrontend::ASTNode>& nodes, std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums) : nodes{nodes}, enums{enums} {} 
+template <class... Ts>
+struct overloads : Ts...
+{
+    using Ts::operator()...;
+};
 
-    IRProgram IRTranslator::Translate() {
-        for (const auto& n : nodes) {
+template <class... Ts>
+overloads(Ts...) -> overloads<Ts...>;
+
+namespace nbuIR
+{
+    IRTranslator::IRTranslator(const std::vector<nbuFrontend::ASTNode>& nodes,
+                               std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums,
+                               std::unordered_map<std::string, nbuFrontend::SymboleInfo>& globalVar) : nodes{nodes},
+        enums{enums},
+        globals{globalVar}
+    {
+    }
+
+    IRProgram IRTranslator::Translate()
+    {
+        for (const auto& [name, info] : globals)
+        {
+            Val dst;
+                dst = Val(name, Val::Type::GLO, toIRType(info.type));
+            if (n.info != nullptr && currentBlock != nullptr)
+            {
+                Val lf = TranslateExpr(*info);
+                if (currentBlock != nullptr)
+                    emitLocalDeclaration(dst, lf);
+                else
+                    emitGlobaleclaration(dst, lf);
+            }
+            else if (currentBlock == nullptr)
+            {
+                emitGlobaleclaration(dst);
+            }
+        }
+        for (const auto& n : nodes)
+        {
             TranslateStmt(n);
         }
         return prog;
     }
 
-    void IRTranslator::TranslateStmt(const nbuFrontend::ASTNode& n) {
-        std::visit(overloads {
-            [&](const nbuFrontend::FuncStmtNode& node) {TranslateStmt(node);},
-            [&](const nbuFrontend::BlockStmtNode& node) {TranslateStmt(node);},
-            [&](const nbuFrontend::ReturnStmtNode& node) {TranslateStmt(node);},
-            [&](const nbuFrontend::IfStmtNode& node) {TranslateStmt(node);},
-            [&](const nbuFrontend::writeAddrNode& node) {TranslateStmt(node);},
-            [&](const nbuFrontend::VariableDeclareNode& node) {TranslateStmt(node);},
-            [&](const auto& n) {TranslateExpr(n);}
-        }, n);
+    void IRTranslator::TranslateStmt(const nbuFrontend::ASTNode& n)
+    {
+        std::visit(overloads{
+                       [&](const nbuFrontend::FuncStmtNode& node) { TranslateStmt(node); },
+                       [&](const nbuFrontend::BlockStmtNode& node) { TranslateStmt(node); },
+                       [&](const nbuFrontend::ReturnStmtNode& node) { TranslateStmt(node); },
+                       [&](const nbuFrontend::IfStmtNode& node) { TranslateStmt(node); },
+                       [&](const nbuFrontend::writeAddrNode& node) { TranslateStmt(node); },
+                       [&](const nbuFrontend::VariableDeclareNode& node) { TranslateStmt(node); },
+                       [&](const auto& node) { TranslateExpr(node); }
+                   }, n);
     }
 
-    void IRTranslator::TranslateStmt(const nbuFrontend::FuncStmtNode& n) {
+    void IRTranslator::TranslateStmt(const nbuFrontend::FuncStmtNode& n)
+    {
         prog.functions.emplace_back();
         IRFunction& func = prog.functions.back();
         func.id = n.id;
         func.retType = toIRType(n.retType);
         currentFunc = &func;
         func.blocks.emplace_back();
-        func.blocks.back().label = "entry";
+        func.blocks.back().label = "ENTRY";
         currentBlock = &func.blocks.back();
         TranslateStmt(*n.code);
         currentBlock = nullptr;
         currentFunc = nullptr;
     }
 
-    void IRTranslator::TranslateStmt(const nbuFrontend::IfStmtNode& n) {
-        int currentCounter = blockCounter++;
-        TranslateExpr(*n.condition);        
-        emitJE(makeBLable("IF_"+std::to_string(currentCounter)));
+    void IRTranslator::TranslateStmt(const nbuFrontend::IfStmtNode& n)
+    {
+        std::cout << "block counter : " << blockCounter << std::endl;
+        const uint currentCounter = blockCounter++;
+        TranslateExpr(*n.condition);
+        emitJE(makeBLable("IF_" + std::to_string(currentCounter)));
         if (n.elseNode != nullptr)
-            emitJMP(makeBLable("ELSE_"+std::to_string(currentCounter)));
+            emitJMP(makeBLable("ELSE_" + std::to_string(currentCounter)));
         else
-            emitJMP(makeBLable("ENDIF_"+std::to_string(currentCounter)));
+            emitJMP(makeBLable("ENDIF_" + std::to_string(currentCounter)));
         IRBlock& ifBlock = currentFunc->blocks.emplace_back();
-        ifBlock.label = "IF_"+std::to_string(currentCounter);
+        ifBlock.label = "IF_" + std::to_string(currentCounter);
         currentBlock = &ifBlock;
         TranslateStmt(*n.ifNode);
-        emitJMP(makeBLable("ENDIF_"+std::to_string(currentCounter)));
-        if (n.elseNode != nullptr) {
+        emitJMP(makeBLable("ENDIF_" + std::to_string(currentCounter)));
+        if (n.elseNode != nullptr)
+        {
             IRBlock& elseBlock = currentFunc->blocks.emplace_back();
-            emitJMP(makeBLable(elseBlock.label));
+            elseBlock.label = "ELSE_" + std::to_string(currentCounter);
             currentBlock = &elseBlock;
-            elseBlock.label = "ELSE_"+std::to_string(currentCounter);
             TranslateStmt(*n.elseNode);
-            emitJMP(makeBLable("ENDIF_"+std::to_string(currentCounter)));
+            emitJMP(makeBLable("ENDIF_" + std::to_string(currentCounter)));
         }
         IRBlock& endBlock = currentFunc->blocks.emplace_back();
-        endBlock.label = "ENDIF_"+std::to_string(currentCounter);
+        endBlock.label = "ENDIF_" + std::to_string(currentCounter);
         currentBlock = &endBlock;
         ++blockCounter;
     }
 
-    void IRTranslator::TranslateStmt(const nbuFrontend::BlockStmtNode& n) {
-        for (const auto& node : n.codes) {
+    void IRTranslator::TranslateStmt(const nbuFrontend::BlockStmtNode& n)
+    {
+        for (const auto& node : n.codes)
+        {
             TranslateStmt(*node);
         }
     }
 
-    void IRTranslator::TranslateStmt(const nbuFrontend::ReturnStmtNode& n) {
+    void IRTranslator::TranslateStmt(const nbuFrontend::ReturnStmtNode& n)
+    {
         if (n.expression != nullptr)
             emitReturn(TranslateExpr(*n.expression));
         else
             emitReturn(Val{});
     }
 
-    void IRTranslator::TranslateStmt(const nbuFrontend::writeAddrNode& n) {
+    void IRTranslator::TranslateStmt(const nbuFrontend::writeAddrNode& n)
+    {
         Val dst = TranslateExpr(*n.addr);
         Val lf = TranslateExpr(*n.value);
         emitWrite(dst, lf);
     }
 
-    void IRTranslator::TranslateStmt(const nbuFrontend::VariableDeclareNode& n) {
+    void IRTranslator::TranslateStmt(const nbuFrontend::VariableDeclareNode& n)
+    {
         Val dst;
+        std::cout << n.name << " " << " " << n.type << " " << n.vInfo.isGlobal << std::endl;
         if (n.vInfo.isGlobal)
             dst = Val(n.vInfo.name, Val::Type::GLO, toIRType(n.type));
         else
             dst = Val(n.vInfo.stackOffset, Val::Type::LOC, toIRType(n.type));
-        if (n.info != nullptr && currentBlock != nullptr) {
-            Val lf = TranslateExpr(*n.info);    
-            if (currentBlock != nullptr) 
+        if (n.info != nullptr && currentBlock != nullptr)
+        {
+            Val lf = TranslateExpr(*n.info);
+            if (currentBlock != nullptr)
                 emitLocalDeclaration(dst, lf);
-            else 
+            else
                 emitGlobaleclaration(dst, lf);
         }
-        else if (currentBlock == nullptr) {
+        else if (currentBlock == nullptr)
+        {
             emitGlobaleclaration(dst);
         }
     }
 
-    Val IRTranslator::TranslateExpr(const nbuFrontend::ASTNode& n) {
-        return std::visit(overloads {
-            [&](const nbuFrontend::Int32LiteralNode& n) {
-                return Val(static_cast<int64_t>(n.value),Type::I32);
-            },
-            [&](const nbuFrontend::Float32LiteralNode& n) {
-                return Val(n.value,Type::F32);
-            },
-            [&](const nbuFrontend::BinaryOpNode& n) {
-                Val lf = TranslateExpr(*n.left);
-                Val rf = TranslateExpr(*n.right);
+    Val IRTranslator::TranslateExpr(const nbuFrontend::ASTNode& n)
+    {
+        return std::visit(overloads{
+                              [&](const nbuFrontend::Int32LiteralNode& n)
+                              {
+                                  return Val(static_cast<int64_t>(n.value), Type::I32);
+                              },
+                              [&](const nbuFrontend::Float32LiteralNode& n)
+                              {
+                                  return Val(n.value, Type::F32);
+                              },
+                              [&](const nbuFrontend::BinaryOpNode& n)
+                              {
+                                  const Val lf = TranslateExpr(*n.left);
+                                  const Val rf = TranslateExpr(*n.right);
 
-                Val tmp = makeTemp(toIRType(n.precision));
-                emitBinary(n.op, tmp, lf, rf);
-                return tmp;
-            },
-            [&](const nbuFrontend::VariableAccessNode& n) {
-                if (n.info.isGlobal)
-                    return Val(n.info.name, Val::Type::GLO, toIRType(n.precision));
-                else
-                    return Val(n.info.stackOffset, Val::Type::LOC, toIRType(n.precision));
+                                  Val tmp = makeTemp(toIRType(n.precision));
+                                  emitBinary(n.op, tmp, lf, rf);
+                                  return tmp;
+                              },
+                              [&](const nbuFrontend::VariableAccessNode& n)
+                              {
+                                  if (n.info.isGlobal)
+                                      return Val(n.info.name, Val::Type::GLO, toIRType(n.precision));
+                                  else
+                                      return Val(n.info.stackOffset, Val::Type::LOC, toIRType(n.precision));
+                              },
+                              [&](const nbuFrontend::UnaryOpNode& n)
+                              {
+                                  Val lf = TranslateExpr(*n.operand);
 
-            },
-            [&](const nbuFrontend::UnaryOpNode& n) {
-                Val lf = TranslateExpr(*n.operand);
+                                  Val tmp = makeTemp(toIRType(n.precision));
+                                  emitUnary(n.op, tmp, lf);
+                                  return tmp;
+                              },
+                              [&](const nbuFrontend::FuncCallStmtNode& n)
+                              {
+                                  std::vector<Val> params;
+                                  if (n.callParameters.size() != 0)
+                                  {
+                                      for (const auto& par : n.callParameters)
+                                          params.push_back(TranslateExpr(*par));
+                                  }
 
-                Val tmp = makeTemp(toIRType(n.precision));
-                emitUnary(n.op, tmp, lf);
-                return tmp;
-            },
-            [&](const nbuFrontend::FuncCallStmtNode& n) {
-                std::vector<Val> params;
-                if (n.callParameters.size() != 0) {
-                    for (const auto& par : n.callParameters)
-                        params.push_back(TranslateExpr(*par));
-                }
+                                  Val func = makeFLable(n.id);
+                                  Val ret = makeTemp(toIRType(n.retType));
+                                  emitCall(func, ret, std::move(params));
+                                  return ret;
+                              },
+                              [&](const nbuFrontend::VariableModNode& n)
+                              {
+                                  Val var = TranslateExpr(*n.variable);
+                                  Val lf = TranslateExpr(*n.info);
 
-                Val func = makeFLable(n.id);
-                Val ret = makeTemp(toIRType(n.retType));
-                emitCall(func, ret, std::move(params));
-                return ret;
-            },
-            [&](const nbuFrontend::VariableModNode& n) {
-                Val var = TranslateExpr(*n.variable);
-                Val lf = TranslateExpr(*n.info);
+                                  emitAssign(var, lf);
+                                  return var;
+                              },
+                              [&](const nbuFrontend::PromotionNode& n)
+                              {
+                                  Val lf = TranslateExpr(*n.info); // will always have a type
+                                  Val tmp = makeTemp(toIRType(n.topromote));
+                                  emitConv(tmp, lf);
+                                  return tmp;
+                              },
+                              [&](const nbuFrontend::readAddrNode& n)
+                              {
+                                  Val lf = TranslateExpr(*n.addr);
+                                  nbuFrontend::Type t;
+                                  switch (n.quantity)
+                                  {
+                                  case 1:
+                                      t = nbuFrontend::Type{nbuFrontend::Type::Kind::UINT8};
+                                      break;
+                                  case 2:
+                                      t = nbuFrontend::Type{nbuFrontend::Type::Kind::UINT16};
+                                      break;
+                                  case 4:
+                                      t = nbuFrontend::Type{nbuFrontend::Type::Kind::UINT32};
+                                      break;
+                                  case 8:
+                                      t = nbuFrontend::Type{nbuFrontend::Type::Kind::UINT64};
+                                      break;
+                                  }
+                                  Val tmp = makeTemp(toIRType(t));
+                                  emitRead(tmp, lf);
+                                  return tmp;
+                              },
+                              [&](const nbuFrontend::asmNode& n) { return makeTemp(Type::U32); },
+                              // will find implementation later
+                              [&](const nbuFrontend::EnumAccessNode& n)
+                              {
+                                  Val val(static_cast<int64_t>(enums[n.enumName + "::" + n.enumMember].raw_value),
+                                          toIRType(enums[n.enumName + "::" + n.enumMember].backing_type));
+                                  return val;
+                              },
+                              [&](const nbuFrontend::StructAccessNode& n)
+                              {
+                                  Val base = TranslateExpr(*n.firstPart);
 
-                emitAssign(var, lf);
-                return var;
-            },
-            [&](const nbuFrontend::PromotionNode& n) {
-                Val lf = TranslateExpr(*n.info); // will always have a type
-                Val tmp = makeTemp(toIRType(n.topromote));
-                emitConv(tmp, lf);
-                return tmp;
-            },
-            [&](const nbuFrontend::readAddrNode& n) {
-                Val lf = TranslateExpr(*n.addr);
-                nbuFrontend::Type t;
-                switch (n.quantity) {
-                    case 1:
-                        t = nbuFrontend::Type{nbuFrontend::Type::Kind::UINT8};
-                        break;
-                    case 2:
-                        t = nbuFrontend::Type{nbuFrontend::Type::Kind::UINT16};
-                        break;
-                    case 4:
-                        t = nbuFrontend::Type{nbuFrontend::Type::Kind::UINT32};
-                        break;
-                    case 8:
-                        t = nbuFrontend::Type{nbuFrontend::Type::Kind::UINT64};
-                        break;
-                }
-                Val tmp = makeTemp(toIRType(t));
-                emitRead(tmp, lf);
-                return tmp;
-            },
-            [&](const nbuFrontend::asmNode& n) { return makeTemp(Type::U32);}, // will find implementation later
-            [&](const nbuFrontend::EnumAccessNode& n) {
-                Val val(static_cast<int64_t>(enums[n.enumName+"::"+n.enumMember].raw_value), toIRType(enums[n.enumName+"::"+n.enumMember].backing_type));
-                return val;
-            },
-            [&](const nbuFrontend::StructAccessNode& n) {
-                Val base = TranslateExpr(*n.firstPart);
-
-                Val addr = makeTemp(Type::U64);
-                emitBinary(
-                    nbuFrontend::TokenType::PLUS,
-                    addr,
-                    base,
-                    Val(static_cast<int64_t>(n.info.offset), Type::I32)
-                );
-                return addr;
-            },
-            [&](const auto& n) {return makeTemp(Type::I32);}
-        },n);
+                                  Val addr = makeTemp(Type::U64);
+                                  emitBinary(
+                                      nbuFrontend::TokenType::PLUS,
+                                      addr,
+                                      base,
+                                      Val(static_cast<int64_t>(n.info.offset), Type::I32)
+                                  );
+                                  return addr;
+                              },
+                              [&](const auto& n) { return makeTemp(Type::I32); }
+                          }, n);
     }
 
-    Val IRTranslator::makeTemp(const Type& t) {
+    Val IRTranslator::makeTemp(const Type& t)
+    {
         Val ret;
         ret.id = tempCounter++;
         ret.type = Val::Type::TEMP;
@@ -212,109 +272,130 @@ namespace nbuIR {
         return ret;
     }
 
-    Val makeFLable(size_t id) {
+    Val makeFLable(size_t id)
+    {
         Val ret;
         ret.id = id;
         ret.type = Val::Type::LABF;
         return ret;
     }
 
-    Val makeBLable(const std::string& name) {
+    Val makeBLable(const std::string& name)
+    {
         Val ret;
         ret.name = name;
         ret.type = Val::Type::LABB;
         return ret;
     }
 
-    void IRTranslator::emitBinary(nbuFrontend::TokenType op, const Val& dst, const Val& lf, const Val& rf) {
+    void IRTranslator::emitBinary(nbuFrontend::TokenType op, const Val& dst, const Val& lf, const Val& rf)
+    {
         Op instOp;
-        switch (op) {
-            case nbuFrontend::TokenType::PLUS:
-                instOp = Op::ADD;
-                break;
-            case nbuFrontend::TokenType::MINUS:
-                instOp = Op::SUB;
-                break;
-            case nbuFrontend::TokenType::PERCENT:
-            case nbuFrontend::TokenType::SLASH:
-                instOp = Op::DIV;
-                break;
-            case nbuFrontend::TokenType::STAR:
-                instOp = Op::MUL;
-                break;
-            case nbuFrontend::TokenType::AND:
-                instOp = Op::AND;
-                break;
-            case nbuFrontend::TokenType::OR:
-                instOp = Op::OR;
-                break;
-            case nbuFrontend::TokenType::XOR:
-                instOp = Op::XOR;
-                break;
-            case nbuFrontend::TokenType::NOT:
-                instOp = Op::NOT;
-                break;
-            case nbuFrontend::TokenType::EQUALEQUAL:
-                instOp = Op::CMP;
-                break;
-            default:
-                instOp = Op::ADD;
+        switch (op)
+        {
+        case nbuFrontend::TokenType::PLUS:
+            instOp = Op::ADD;
+            break;
+        case nbuFrontend::TokenType::MINUS:
+            instOp = Op::SUB;
+            break;
+        case nbuFrontend::TokenType::PERCENT:
+        case nbuFrontend::TokenType::SLASH:
+            instOp = Op::DIV;
+            break;
+        case nbuFrontend::TokenType::STAR:
+            instOp = Op::MUL;
+            break;
+        case nbuFrontend::TokenType::AND:
+            instOp = Op::AND;
+            break;
+        case nbuFrontend::TokenType::OR:
+            instOp = Op::OR;
+            break;
+        case nbuFrontend::TokenType::XOR:
+            instOp = Op::XOR;
+            break;
+        case nbuFrontend::TokenType::NOT:
+            instOp = Op::NOT;
+            break;
+        case nbuFrontend::TokenType::EQUALEQUAL:
+            instOp = Op::CMP;
+            break;
+        default:
+            instOp = Op::ADD;
+            break;
         }
 
         currentBlock->instructions.push_back(IRInst{instOp, dst, lf, rf});
     }
 
-    void IRTranslator::emitUnary(nbuFrontend::TokenType op, const Val& dst, const Val& lf) {
+    void IRTranslator::emitUnary(nbuFrontend::TokenType op, const Val& dst, const Val& lf)
+    {
         Op instOp;
-        switch (op) {
-            case nbuFrontend::TokenType::NOT:
-            case nbuFrontend::TokenType::DIFFERENT:
-                instOp = Op::NOT;
-            case nbuFrontend::TokenType::MINUS:
-                instOp = Op::SUB; // work by subbstracting the value * 2
-            default: // The only three for now are handled aboves
-                instOp = Op::NOT;
+        switch (op)
+        {
+        case nbuFrontend::TokenType::NOT:
+        case nbuFrontend::TokenType::DIFFERENT:
+            instOp = Op::NOT;
+            break;
+        case nbuFrontend::TokenType::MINUS:
+            instOp = Op::SUB; // work by substrating the value * 2
+            break;
+        default: // The only three for now are handled above
+            instOp = Op::NOT;
+            break;
         }
         currentBlock->instructions.push_back(IRInst{instOp, dst, lf});
     }
 
-    void IRTranslator::emitLocalDeclaration(const Val& dst, const Val& lf) {
+    void IRTranslator::emitLocalDeclaration(const Val& dst, const Val& lf)
+    {
         currentBlock->instructions.push_back(IRInst{Op::STORE, dst, lf});
     }
 
-    void IRTranslator::emitGlobaleclaration(const Val& dst, const Val& lf) {
+    void IRTranslator::emitGlobaleclaration(const Val& dst, const Val& lf)
+    {
         prog.globals.push_back(IRInst{Op::STORE, dst, lf});
     }
 
-    void IRTranslator::emitCall(const Val& func, const Val& ret, std::vector<Val> params) {
-        currentBlock->instructions.push_back(IRInst{.op = Op::CALL, .dst = ret, .lf = func, .args = std::move(params)}); // dst is for the return value, lf is the function to call
+    void IRTranslator::emitCall(const Val& func, const Val& ret, std::vector<Val> params)
+    {
+        currentBlock->instructions.push_back(IRInst{.op = Op::CALL, .dst = ret, .lf = func, .args = std::move(params)});
+        // dst is for the return value, lf is the function to call
     }
 
-    void IRTranslator::emitAssign(const Val& var, const Val& lf) {
+    void IRTranslator::emitAssign(const Val& var, const Val& lf)
+    {
         currentBlock->instructions.push_back(IRInst{Op::STORE, var, lf});
     }
 
-    void IRTranslator::emitConv(const Val& dst, const Val& lf) {
+    void IRTranslator::emitConv(const Val& dst, const Val& lf)
+    {
         currentBlock->instructions.push_back(IRInst{Op::CAST, dst, lf});
     }
 
-    void IRTranslator::emitRead(const Val& dst, const Val& lf) {
+    void IRTranslator::emitRead(const Val& dst, const Val& lf)
+    {
         currentBlock->instructions.push_back(IRInst{Op::LOAD, dst, lf});
     }
-    
-    void IRTranslator::emitWrite(const Val& dst, const Val& lf) {
-        currentBlock->instructions.push_back(IRInst{Op::STORE,dst, lf});
+
+    void IRTranslator::emitWrite(const Val& dst, const Val& lf)
+    {
+        currentBlock->instructions.push_back(IRInst{Op::STORE, dst, lf});
     }
 
-    void IRTranslator::emitReturn(const Val& lf) {
-        currentBlock->instructions.push_back(IRInst{Op::RET,Val{}, lf}); // tmp
+    void IRTranslator::emitReturn(const Val& lf)
+    {
+        currentBlock->instructions.push_back(IRInst{Op::RET, Val{}, lf}); // tmp
     }
 
-    void IRTranslator::emitJMP(const Val& lab) {
+    void IRTranslator::emitJMP(const Val& lab)
+    {
         currentBlock->instructions.push_back(IRInst{Op::JMP, Val{}, lab});
     }
 
-    void IRTranslator::emitJE(const Val& lab) {
+    void IRTranslator::emitJE(const Val& lab)
+    {
         currentBlock->instructions.push_back(IRInst{Op::JZ, Val{}, lab});
     }
 }

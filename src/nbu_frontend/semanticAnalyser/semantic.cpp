@@ -68,10 +68,11 @@ namespace nbuFrontend {
                 },
                 [this](FuncStmtNode& n) {
                     currentFunc = functions[n.name];
-                    scopeStack.push_back({});
+                    scopeStack.emplace_back();
                     for (ASTNode*& parameterNode : n.parameters) {
+                        size_t paramOffset = 0;
                         std::visit(overloads {
-                            [this](VariableDeclareNode& n) {
+                            [&](VariableDeclareNode& n) {
                                 size_t size;
                                 if (n.type.kind != Type::Kind::STRUCT) {
                                     size = typeSize[n.type.kind];
@@ -83,7 +84,8 @@ namespace nbuFrontend {
                                 else {
                                     size = globalStructRegistery[n.type.name].size;
                                 }
-                                scopeStack.back().emplace(n.name, SymboleInfo{n.type, 0, n.name, true, size});
+                                paramOffset += size;
+                                scopeStack.back().emplace(n.name, SymboleInfo{n.type, paramOffset, n.name, false, size});
                                 if (n.info != nullptr) {
                                     codeSemanticAnalyses(*n.info);
                                     Type retType = type_precision(*n.info);
@@ -96,7 +98,7 @@ namespace nbuFrontend {
                                     }
                                 }
                             },
-                            [this](auto& n) {print_error("only variable declaration can be done in the function declaration"); }
+                            [&](auto& n) {print_error("only variable declaration can be done in the function declaration"); }
                         },*parameterNode);
                     }
                     if (n.code != nullptr)
@@ -248,7 +250,7 @@ namespace nbuFrontend {
                 }
                 offset += size;
                 offset = (offset + alignment - 1) & ~(alignment - 1);
-                scopeStack.back().emplace(n.name, SymboleInfo{n.type, offset});
+                scopeStack.back().emplace(n.name, SymboleInfo{.type = n.type, .stackOffset = offset});
                 n.vInfo = scopeStack.back()[n.name];
                 if (n.info != nullptr) {
                     codeSemanticAnalyses(*n.info);

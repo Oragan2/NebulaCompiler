@@ -33,6 +33,10 @@ namespace nbuIR {
 
     std::string irProgramToStr(const IRProgram &prog) {
         std::string ret;
+        for (const auto& glob : prog.globals)
+        {
+            ret += irInstToStr(glob)+"\n";
+        }
         for (const auto& func : prog.functions) 
             ret += irFunctionToStr(func)+"\n";
         return ret;

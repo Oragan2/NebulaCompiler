@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "ir.h"
+
 namespace nbuBackend {
     enum class Register : uint8_t {
         A = 0x01, // Accumulator
@@ -64,7 +66,7 @@ namespace nbuBackend {
     
     class CodeGen {
         public:
-        CodeGen(std::vector<nbuFrontend::ASTNode>& nodes, std::ofstream& file, std::unordered_map<std::string, nbuFrontend::StructTypeInfo>& structs, std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums);
+        CodeGen(const nbuIR::IRProgram& prog, std::ofstream& file);
         void generate();
 
         private:
@@ -84,14 +86,9 @@ namespace nbuBackend {
         void emitLabel(const std::string& name);
         void emitComment(const std::string& comment);
 
-        std::vector<nbuFrontend::ASTNode>& nodes;
-        std::unordered_map<std::string, nbuFrontend::StructTypeInfo>& structs;
-        std::unordered_map<std::string, int> localOffsetMap;
         int localOffsetCursor;
         int alignOffset;
-        std::string currentLabel;
-        std::unordered_set<std::string> globalVariable;
-        std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums;
+        const nbuIR::IRProgram& prog;
         std::ofstream& file;
         std::stringstream data;
         std::stringstream bss;

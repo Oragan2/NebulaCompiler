@@ -1,5 +1,4 @@
 #include "codegen.h"
-#include "../../nbu_frontend/parser/parser.h"
 #include <cstdint>
 #include <fstream>
 #include <sstream>
@@ -11,14 +10,13 @@ template<class... Ts> overloads(Ts...) -> overloads<Ts...>;
 
 
 namespace nbuBackend {
-    CodeGen::CodeGen(std::vector<nbuFrontend::ASTNode>& nodes, std::ofstream& file, std::unordered_map<std::string, nbuFrontend::StructTypeInfo>& structs, std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums) : nodes{nodes}, file{file}, structs{structs}, enums{enums} {}
+    CodeGen::CodeGen(const nbuIR::IRProgram& prog, std::ofstream& file) : prog{prog}, file{file} {}
     
     void CodeGen::emit(const Op& op, const Operand& dst, const Operand& src, int byteSize) {
         std::string reg1 = formatOperand(dst, byteSize);
         std::string reg2 = formatOperand(src, byteSize);
         bool isFloat = (reg1.find("xmm") < std::string::npos || reg2.find("xmm") < std::string::npos);
         std::string opStr = opToStr(op);
-        
     }
 
     std::string opToStr(const Op &op) {
@@ -127,11 +125,6 @@ namespace nbuBackend {
         }
     }
 
-    void CodeGen::emitLabel(const std::string& name) {
-        text << name << ":\n";
-        currentLabel = name;
-    }
-
     void CodeGen::emitComment(const std::string& comment) {
         text << "\t; " << comment << "\n";
     }
@@ -142,65 +135,11 @@ namespace nbuBackend {
         text << "section .text\n";
         rodata << "section .rodata\n";
 
-        for (const auto& node : nodes) {
-            std::visit(overloads {
-                [&](const nbuFrontend::VariableDeclareNode& n) {
-                    if (n.type.kind != nbuFrontend::Type::Kind::STRUCT) {
-                        data << "\t" + n.name + ": d";
-                        switch(nbuFrontend::typeSize[n.type.kind]) {
-                            case 1:
-                                data << "b ";
-                                break;
-                            case 2:
-                                data << "w ";
-                                break;
-                            case 4:
-                                data << "d ";
-                                break;
-                            case 8:
-                                data << "q ";
-                                break;
-                        }
-                        if (n.info == nullptr)
-                            data << "0\n";
-                        else {
-                            data << std::visit(overloads {
-                                [](const nbuFrontend::Int32LiteralNode& n) {
-                                    return std::to_string(n.value);
-                                },
-                                [](const nbuFrontend::Float32LiteralNode& n) {
-                                    return std::to_string(n.value);
-                                },
-                                [](const auto&) {
-                                    return std::string{"0"};
-                                }
-                            }, *n.info);
-                            data << "\n";
-                        }
-                    }
-                    else {
-                        bss << "\t" << n.name << ": resb " << calcStructSize(structs[n.type.name]) << "\n";
-                    }
-                    globalVariable.emplace(n.name);
-                },
-                [&](const nbuFrontend::FuncStmtNode& n) {
-                    if (n.name != "main") {
-                        text << "\tglobal " << n.name << "\n";
-                        emitLabel(n.name);
-                    }
-                    else {
-                        text << "\tglobal _start" << "\n";
-                        emitLabel("_start");
-                    }
-                    calcOffsets(*n.code);
-                    emit(Op::PUSH,Register::RBP);
-                    emit(Op::MOV,Register::RBP,Register::RSP);
-                    emit(Op::SUB,Register::RSP,alignOffset);
-                    nodeCalcString(*n.code);
-                },
-                [&](const auto&) {}
-            },node);
+        for (const nbuIR::IRInst& glob : prog.globals)
+        {
+
         }
+
         file << "default rel\n";
         file << data.rdbuf();
         file << bss.rdbuf();

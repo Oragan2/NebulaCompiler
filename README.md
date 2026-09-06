@@ -22,7 +22,7 @@ The language is **not yet production ready** and the syntax and features may cha
 - Type promotion
 - Inline assembly (`asm {}`)
 - Direct memory read/write primitives
-- Kernel-oriented address types (`vaddr`, `paddr`)
+- Kernel-oriented address types (`vaddr`, `paddr`, `ioport`)
 
 ## Target Architecture
 

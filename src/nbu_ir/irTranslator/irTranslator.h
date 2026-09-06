@@ -9,7 +9,7 @@
 namespace nbuIR {
     class IRTranslator {
         public:
-        IRTranslator(const std::vector<nbuFrontend::ASTNode>& nodes, std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums);
+        IRTranslator(const std::vector<nbuFrontend::ASTNode>& nodes, std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums, std::unordered_map<std::string, nbuFrontend::SymboleInfo>& globalVar);
         IRProgram Translate();
 
         private:
@@ -41,6 +41,7 @@ namespace nbuIR {
         IRTranslator();
         const std::vector<nbuFrontend::ASTNode>& nodes;
         std::unordered_map<std::string, nbuFrontend::EnumVariantInfo>& enums;
+        std::unordered_map<std::string, nbuFrontend::SymboleInfo>& globals;
         std::string getFlatKey(const nbuFrontend::ASTNode& n);
         IRProgram prog;
         IRFunction* currentFunc = nullptr;
