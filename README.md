@@ -47,6 +47,8 @@ nbu program.ne
 
 which generates NASM assembly that can be assembled and linked.
 
+See [Documentation of the compiler](https://oragan2.github.io/nebula-doc/Compiler.html)
+
 ## Example
 
 ```ne
@@ -82,7 +84,7 @@ NebulaCompiler aims to provide a language suitable for:
 
 while remaining familiar to developers with experience in C and C++.
 
-## Roadmap
+## Roadmap for V1
 
 - [x] Lexer
 - [x] Parser
@@ -93,6 +95,7 @@ while remaining familiar to developers with experience in C and C++.
 - [x] Enums
 - [x] Function declarations
 - [x] Inline assembly
+- [ ] Ir conversion
 - [ ] Complete x86-64 code generation
 - [ ] Stack frame generation
 - [ ] Function parameters
