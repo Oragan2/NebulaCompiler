@@ -24,7 +24,7 @@ namespace nbuFrontend {
         TokenType::DIFFERENT
     };
 
-    Semantic::Semantic(std::vector<ASTNode>& nodes) : nodes{nodes} {}
+    Semantic::Semantic(std::vector<ASTNode>& nodes) : nodes{nodes}, currentFunc() {}
 
     std::vector<ASTNode>& Semantic::getNodes() {
         return nodes;
@@ -69,8 +69,8 @@ namespace nbuFrontend {
                 [this](FuncStmtNode& n) {
                     currentFunc = functions[n.name];
                     scopeStack.emplace_back();
+                    size_t paramOffset = 0;
                     for (ASTNode*& parameterNode : n.parameters) {
-                        size_t paramOffset = 0;
                         std::visit(overloads {
                             [&](VariableDeclareNode& n) {
                                 size_t size;
@@ -84,8 +84,8 @@ namespace nbuFrontend {
                                 else {
                                     size = globalStructRegistery[n.type.name].size;
                                 }
-                                paramOffset += size;
                                 scopeStack.back().emplace(n.name, SymboleInfo{n.type, paramOffset, n.name, false, size});
+                                paramOffset += size;
                                 if (n.info != nullptr) {
                                     codeSemanticAnalyses(*n.info);
                                     Type retType = type_precision(*n.info);
@@ -248,9 +248,9 @@ namespace nbuFrontend {
                     size = typeSize[n.type.kind];
                     alignment = size;
                 }
+                scopeStack.back().emplace(n.name, SymboleInfo{.type = n.type, .stackOffset = offset});
                 offset += size;
                 offset = (offset + alignment - 1) & ~(alignment - 1);
-                scopeStack.back().emplace(n.name, SymboleInfo{.type = n.type, .stackOffset = offset});
                 n.vInfo = scopeStack.back()[n.name];
                 if (n.info != nullptr) {
                     codeSemanticAnalyses(*n.info);
@@ -307,17 +307,17 @@ namespace nbuFrontend {
                     }
                     n.condition = arena.allocate<ASTNode>(PromotionNode{promote, condType, n.condition});
                 }
-                scopeStack.push_back({});
+                scopeStack.emplace_back();
                 codeSemanticAnalyses(*n.ifNode);
                 scopeStack.pop_back();
                 if (n.elseNode != nullptr) {
-                    scopeStack.push_back({});
+                    scopeStack.emplace_back();
                     codeSemanticAnalyses(*n.elseNode);
                     scopeStack.pop_back();
                 }
             },
             [this](BlockStmtNode& n) {
-                scopeStack.push_back({});
+                scopeStack.emplace_back();
                 for (ASTNode*& blockNode : n.codes) {
                     codeSemanticAnalyses(*blockNode);
                 }

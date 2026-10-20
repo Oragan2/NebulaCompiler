@@ -124,10 +124,7 @@ namespace nbuIR
         if (n.info != nullptr && currentBlock != nullptr)
         {
             Val lf = TranslateExpr(*n.info);
-            if (currentBlock != nullptr)
-                emitLocalDeclaration(dst, lf);
-            else
-                emitGlobaleclaration(dst, lf);
+            emitLocalDeclaration(dst, lf);
         }
     }
 
@@ -319,7 +316,7 @@ namespace nbuIR
             instOp = Op::NOT;
             break;
         case nbuFrontend::TokenType::MINUS:
-            instOp = Op::SUB; // work by substrating the value * 2
+            instOp = Op::SUB; // work by substracting the value * 2
             break;
         default: // The only three for now are handled above
             instOp = Op::NOT;
