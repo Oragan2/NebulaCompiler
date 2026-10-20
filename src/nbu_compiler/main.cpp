@@ -198,7 +198,7 @@ int main(int argc, char** argv)
 
     //print_tree(semantic.getNodes());
 
-    nbuIR::IRTranslator irTranslator{semantic.getNodes(), semantic.getEnums()};
+    nbuIR::IRTranslator irTranslator{semantic.getNodes(), semantic.getEnums(), semantic.getGlobals()};
 
     auto IR = irTranslator.Translate();
 

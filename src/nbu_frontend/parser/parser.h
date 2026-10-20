@@ -7,6 +7,7 @@
 #include <vector>
 #include <variant>
 #include <string>
+#include <cstdint>
 
 namespace nbuFrontend {
     using ASTNode = std::variant<

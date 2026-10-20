@@ -29,18 +29,7 @@ namespace nbuIR
         {
             Val dst;
                 dst = Val(name, Val::Type::GLO, toIRType(info.type));
-            if (n.info != nullptr && currentBlock != nullptr)
-            {
-                Val lf = TranslateExpr(*info);
-                if (currentBlock != nullptr)
-                    emitLocalDeclaration(dst, lf);
-                else
-                    emitGlobaleclaration(dst, lf);
-            }
-            else if (currentBlock == nullptr)
-            {
-                emitGlobaleclaration(dst);
-            }
+            emitGlobaleclaration(dst);
         }
         for (const auto& n : nodes)
         {
@@ -79,8 +68,7 @@ namespace nbuIR
 
     void IRTranslator::TranslateStmt(const nbuFrontend::IfStmtNode& n)
     {
-        std::cout << "block counter : " << blockCounter << std::endl;
-        const uint currentCounter = blockCounter++;
+        const unsigned int currentCounter = blockCounter++;
         TranslateExpr(*n.condition);
         emitJE(makeBLable("IF_" + std::to_string(currentCounter)));
         if (n.elseNode != nullptr)
@@ -132,11 +120,7 @@ namespace nbuIR
     void IRTranslator::TranslateStmt(const nbuFrontend::VariableDeclareNode& n)
     {
         Val dst;
-        std::cout << n.name << " " << " " << n.type << " " << n.vInfo.isGlobal << std::endl;
-        if (n.vInfo.isGlobal)
-            dst = Val(n.vInfo.name, Val::Type::GLO, toIRType(n.type));
-        else
-            dst = Val(n.vInfo.stackOffset, Val::Type::LOC, toIRType(n.type));
+        dst = Val(n.vInfo.stackOffset, Val::Type::LOC, toIRType(n.type));
         if (n.info != nullptr && currentBlock != nullptr)
         {
             Val lf = TranslateExpr(*n.info);
@@ -144,10 +128,6 @@ namespace nbuIR
                 emitLocalDeclaration(dst, lf);
             else
                 emitGlobaleclaration(dst, lf);
-        }
-        else if (currentBlock == nullptr)
-        {
-            emitGlobaleclaration(dst);
         }
     }
 

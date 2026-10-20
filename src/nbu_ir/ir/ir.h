@@ -66,8 +66,8 @@ namespace nbuIR {
         Val(int64_t n, nbuIR::Type t) : type{Type::CONST}, i{n}, valueType{t} {}
         Val(double n, nbuIR::Type t) : type{Type::CONST}, f{n}, valueType{t} {}
         Val(size_t offset, Type type, nbuIR::Type t={}) : type{type}, valueType{t}, offset{offset} {}
-        Val(std::string name, Type type, nbuIR::Type t={}) : type{type}, valueType{t}, name{name} {}
-        Val() {}
+        Val(const std::string& name, Type type, nbuIR::Type t={}) : type{type}, valueType{t}, name{name} {}
+        Val() = default;
     };
 
     Val makeFLable(size_t id);

@@ -17,6 +17,7 @@ namespace nbuFrontend {
         std::vector<ASTNode>& getNodes();
         std::unordered_map<std::string, EnumVariantInfo>& getEnums() {return globalEnumRegistry;}
         std::unordered_map<std::string, StructTypeInfo>& getStruct() {return globalStructRegistery;}
+        std::unordered_map<std::string, SymboleInfo>& getGlobals() {return globalSymbolTable;}
         
         private:
         std::vector<ASTNode>& nodes;
