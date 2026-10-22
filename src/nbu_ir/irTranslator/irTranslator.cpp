@@ -27,9 +27,8 @@ namespace nbuIR
     {
         for (const auto& [name, info] : globals)
         {
-            Val dst;
-                dst = Val(name, Val::Type::GLO, toIRType(info.type));
-            emitGlobaleclaration(dst);
+            Val dst = Val(name, Val::Type::GLO, toIRType(info.type));
+            emitGlobalDeclaration(dst);
         }
         for (const auto& n : nodes)
         {
@@ -121,7 +120,7 @@ namespace nbuIR
     {
         Val dst;
         dst = Val(n.vInfo.stackOffset, Val::Type::LOC, toIRType(n.type));
-        if (n.info != nullptr && currentBlock != nullptr)
+        if (n.info != nullptr && currentBlock != nullptr && !n.vInfo.isGlobal)
         {
             Val lf = TranslateExpr(*n.info);
             emitLocalDeclaration(dst, lf);
@@ -330,12 +329,12 @@ namespace nbuIR
         currentBlock->instructions.push_back(IRInst{Op::STORE, dst, lf});
     }
 
-    void IRTranslator::emitGlobaleclaration(const Val& dst, const Val& lf)
+    void IRTranslator::emitGlobalDeclaration(const Val& dst, const Val& lf)
     {
         prog.globals.push_back(IRInst{Op::STORE, dst, lf});
     }
 
-    void IRTranslator::emitCall(const Val& func, const Val& ret, std::vector<Val> params)
+    void IRTranslator::emitCall(const Val& func, const Val& ret, const std::vector<Val>& params)
     {
         currentBlock->instructions.push_back(IRInst{.op = Op::CALL, .dst = ret, .lf = func, .args = std::move(params)});
         // dst is for the return value, lf is the function to call

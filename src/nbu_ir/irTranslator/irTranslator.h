@@ -27,9 +27,9 @@ namespace nbuIR {
 
         void emitBinary(nbuFrontend::TokenType op, const Val& dst, const Val& lf, const Val& rf);
         void emitLocalDeclaration(const Val& dst, const Val& lf);
-        void emitGlobaleclaration(const Val& dst, const Val& lf=Val{});
+        void emitGlobalDeclaration(const Val& dst, const Val& lf=Val{});
         void emitUnary(nbuFrontend::TokenType op, const Val& dst, const Val& lf);
-        void emitCall(const Val& func, const Val& ret, std::vector<Val> params);
+        void emitCall(const Val& func, const Val& ret, const std::vector<Val>& params);
         void emitAssign(const Val& var, const Val& lf);
         void emitConv(const Val& dst, const Val& lf);
         void emitRead(const Val& dst, const Val& lf);
